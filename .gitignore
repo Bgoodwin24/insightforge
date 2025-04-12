@@ -1,0 +1,39 @@
+# Binary files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Test binary, built with 'go test -c'
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Allow the example
+!.env.example
+
+# IDE files
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# JS frontend
+node_modules/
+
+# Air tmp directory
+tmp/

@@ -14,12 +14,25 @@ graph TD
     G --> H[File Storage]
 ```
 
+## Basic Project Structure
+```
+/
+├── cmd/          # Application entry points
+├── internal/     # Private application and library code
+│   ├── api/      # API routes and handlers
+│   ├── db/       # Database access and models
+│   ├── service/  # Business logic
+├── migrations/   # Database migrations
+├── scripts/      # Helper scripts
+├── frontend/     # React frontend application
+└── queries/      # SQL queries for SQLC
+```
+
 ## Dependencies
 ### Backend
 - Go (v1.21.5 or later)
 - PostgreSQL (v17.4 or later)
 - Gin Web Framework (v1.10.0 or later)
-- GORM (v1.25.12 or later)
 - Godotenv (v1.5.1 or later)
 
 ### Frontend
@@ -30,6 +43,7 @@ graph TD
 ## Development Tools
 - Air (live reloading) (v1.61.7 or later)
 - Goose (database migrations) (v3.24.2 or later)
+- SQLC (type-safe SQL) (v1.28.0 or later)
 - Testify (testing framework) (v1.10.0 or later)
 - HTTPTest (v2.2.0 or later)
 
@@ -39,6 +53,32 @@ graph TD
 - Dataset analysis capabilities
 - User accounts and saved projects
 - Export options for visualizations
+
+## Quick Start
+```bash
+# Clone repository
+git clone https://github.com/Bgoodwin24/insightforge.git
+cd insightforge
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your configuration
+
+# Set up the database
+./scripts/migrate.sh up
+
+# Start backend (in one terminal)
+air
+
+# Start frontend (in another terminal)
+cd frontend
+npm install
+npm start
+```
+**Application will be available at:**
+
+Backend API: http://localhost:8080
+Frontend: http://localhost:3000
 
 ## Setup Instructions
 ### Clone the repository
@@ -56,11 +96,7 @@ sudo apt install golang-go
 ``` bash
 go get -u github.com/gin-gonic/gin
 ```
-- GORM
-``` bash
-go get -u gorm.io/gorm
-go get -u gorm.io/driver/postgres
-```
+
 - PostgreSQL
 ``` bash
 sudo apt update
@@ -69,6 +105,10 @@ sudo apt install postgresql postgresql-contrib
 - PostgreSQL Driver
 ``` bash
 go get -u github.com/lib/pq
+```
+- SQLC
+``` bash
+go install github.com/kyleconroy/sqlc/cmd/sqlc@latest
 ```
 - Goose
 ``` bash
@@ -132,14 +172,32 @@ sudo -u postgres createdb your_database_name
 ```
 **Where your_database_name is replaced by your actual database name**
 
-### Run migrations
+### Using Helper Scripts
+This project includes helpful scripts to interact with the database:
+
+#### Database Connection Script
+- You need to create your .env based off the example provided in .env.example with your actual local values for these scripts to work!
+
+- Migrations should live in the `migrations` directory at the project root
+    - New migrations should follow the convention XXX_relevant_descriptor.sql eg. 001_users.sql, 002_datasets.sql, etc.
 
 ``` bash
-goose up
+# Connect to the database using environment variables
+./scripts/db.sh
+```
+
+- Migration Script
+``` bash
+# Run migrations Up
+./scripts/migrate.sh up
+
+# Run migrations Down
+./scripts/migrate.sh down
 ```
 
 ## Running the application
 ### Start the backend with Air
+(Run in a separate terminal that is also "cd'd" to the project root)
 ``` bash
 air
 ```
@@ -149,6 +207,12 @@ air
 cd frontend
 npm start
 ```
+
+### Generate Type-Safe SQL Code
+(This is used after SQL queries are created to generate Go code with functions, etc.)
+```bash
+sqlc generate
+``` 
 
 ... more to instructions to come
 

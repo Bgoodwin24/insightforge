@@ -1,14 +1,15 @@
 package main
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -16,20 +17,30 @@ func main() {
 		log.Fatalf("Failed to load .env file")
 	}
 
-	dsn := "host=" + os.Getenv("DB_HOST") +
-		" user=" + os.Getenv("DB_USER") +
-		" password=" + os.Getenv("DB_PASSWORD") +
-		" dbname=" + os.Getenv("DB_NAME") +
-		" port=" + os.Getenv("DB_PORT") +
-		" sslmode=" + os.Getenv("DB_SSLMODE") +
-		" TimeZone=" + os.Getenv("DB_TIMEZONE")
+	dbHost := os.Getenv("DB_HOST")
+	dbUser := os.Getenv("DB_USER")
+	dbPass := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
+	dbPort := os.Getenv("DB_PORT")
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		dbHost, dbPort, dbUser, dbPass, dbName)
+
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
 
 	log.Println("Database connected successfully:", db != nil)
+
+	queries := db.New(db)
+
+	ctx := context.Background()
 
 	router := gin.Default()
 

@@ -31,6 +31,7 @@ graph TD
 ## Dependencies
 ### Backend
 - Go (v1.21.5 or later)
+- UUID generation (Googles UUID package v1.6.0 or later)
 - PostgreSQL (v17.4 or later)
 - Gin Web Framework (v1.10.0 or later)
 - Godotenv (v1.5.1 or later)
@@ -92,11 +93,14 @@ git clone github.com/Bgoodwin24/insightforge.git
 sudo apt update
 sudo apt install golang-go
 ```
+- Google UUID
+``` bash
+go get github.com/google/uuid
+```
 - Gin Web Framework
 ``` bash
 go get -u github.com/gin-gonic/gin
 ```
-
 - PostgreSQL
 ``` bash
 sudo apt update

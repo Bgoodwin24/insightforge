@@ -7,14 +7,17 @@ import (
 	"log"
 	"os"
 
+	"github.com/Bgoodwin24/insightforge/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 func main() {
+	logger.Init()
+
 	if err := godotenv.Load(); err != nil {
-		log.Fatalf("Failed to load .env file")
+		logger.Logger.Fatalf("Failed to load .env file")
 	}
 
 	dbHost := os.Getenv("DB_HOST")
@@ -28,12 +31,12 @@ func main() {
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Logger.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+		logger.Logger.Fatalf("Failed to ping database: %v", err)
 	}
 
 	log.Println("Database connected successfully:", db != nil)
@@ -47,6 +50,7 @@ func main() {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "OK"})
 	})
+	router.GET("/verify", userHandler.VerifyEmail)
 
 	port := os.Getenv("API_PORT")
 	if port == "" {
@@ -54,7 +58,7 @@ func main() {
 	}
 
 	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("Failed to run server: %v", err)
+		logger.Logger.Fatalf("Failed to run server: %v", err)
 	}
 
 }

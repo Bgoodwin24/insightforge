@@ -7,24 +7,36 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (username, email, password_hash)
-VALUES ($1, $2, $3)
-RETURNING id, created_at, updated_at, email, username, password_hash
+INSERT INTO users (id, created_at, updated_at, username, email, password_hash)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, created_at, updated_at, email, username, password_hash, failed_login_attempts, last_failed_attempt, locked_until
 `
 
 type CreateUserParams struct {
+	ID           uuid.UUID
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 	Username     string
 	Email        string
 	PasswordHash string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, arg.Username, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRowContext(ctx, createUser,
+		arg.ID,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+		arg.Username,
+		arg.Email,
+		arg.PasswordHash,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -33,12 +45,36 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.Username,
 		&i.PasswordHash,
+		&i.FailedLoginAttempts,
+		&i.LastFailedAttempt,
+		&i.LockedUntil,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, created_at, updated_at, email, username, password_hash, failed_login_attempts, last_failed_attempt, locked_until FROM users WHERE email = $1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.FailedLoginAttempts,
+		&i.LastFailedAttempt,
+		&i.LockedUntil,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, created_at, updated_at, email, username, password_hash FROM users WHERE id = $1
+SELECT id, created_at, updated_at, email, username, password_hash, failed_login_attempts, last_failed_attempt, locked_until FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -51,6 +87,47 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Email,
 		&i.Username,
 		&i.PasswordHash,
+		&i.FailedLoginAttempts,
+		&i.LastFailedAttempt,
+		&i.LockedUntil,
 	)
 	return i, err
+}
+
+const resetLoginAttempts = `-- name: ResetLoginAttempts :exec
+UPDATE users
+SET failed_login_attempts = 0,
+    last_failed_attempt = NULL,
+    locked_until = NULL
+WHERE id = $1
+`
+
+func (q *Queries) ResetLoginAttempts(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, resetLoginAttempts, id)
+	return err
+}
+
+const updateLoginAttempts = `-- name: UpdateLoginAttempts :exec
+UPDATE users
+SET failed_login_attempts = $2,
+    last_failed_attempt = $3,
+    locked_until = $4
+WHERE id = $1
+`
+
+type UpdateLoginAttemptsParams struct {
+	ID                  uuid.UUID
+	FailedLoginAttempts sql.NullInt32
+	LastFailedAttempt   sql.NullTime
+	LockedUntil         sql.NullTime
+}
+
+func (q *Queries) UpdateLoginAttempts(ctx context.Context, arg UpdateLoginAttemptsParams) error {
+	_, err := q.db.ExecContext(ctx, updateLoginAttempts,
+		arg.ID,
+		arg.FailedLoginAttempts,
+		arg.LastFailedAttempt,
+		arg.LockedUntil,
+	)
+	return err
 }

@@ -37,6 +37,16 @@ type DatasetRecord struct {
 	UpdatedAt time.Time
 }
 
+type PendingUser struct {
+	ID           uuid.UUID
+	Email        string
+	Username     string
+	PasswordHash string
+	Token        string
+	CreatedAt    time.Time
+	ExpiresAt    time.Time
+}
+
 type RecordValue struct {
 	RecordID uuid.UUID
 	FieldID  uuid.UUID
@@ -44,10 +54,13 @@ type RecordValue struct {
 }
 
 type User struct {
-	ID           uuid.UUID
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Email        string
-	Username     string
-	PasswordHash string
+	ID                  uuid.UUID
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	Email               string
+	Username            string
+	PasswordHash        string
+	FailedLoginAttempts sql.NullInt32
+	LastFailedAttempt   sql.NullTime
+	LockedUntil         sql.NullTime
 }

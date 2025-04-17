@@ -31,8 +31,8 @@ func (s *UserService) CreateUser(username, email, password string) (*database.Us
 	// Use repo to create user
 	createUserParams := database.CreateUserParams{
 		ID:           uuid.New(),
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
 		Email:        email,
 		Username:     username,
 		PasswordHash: hashed,
@@ -127,8 +127,8 @@ func (s *UserService) ActivateUser(token string) error {
 
 	_, err = s.Repo.Queries.CreateUser(context.Background(), database.CreateUserParams{
 		ID:           pending.ID,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
 		Email:        pending.Email,
 		Username:     pending.Username,
 		PasswordHash: pending.PasswordHash,

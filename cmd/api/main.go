@@ -15,6 +15,10 @@ import (
 	_ "github.com/lib/pq"
 )
 
+type Mailer interface {
+	SendVerificationEmail(email, username, verificationLink string) error
+}
+
 func main() {
 	// Initialize logger
 	logger.Init()
@@ -55,9 +59,18 @@ func main() {
 		DB: db,
 	}
 
+	// Set up email configuration (you can load these from environment variables)
+	emailConfig := handlers.EmailConfig{
+		SMTPServer:   os.Getenv("SMTP_HOST"),
+		SMTPPort:     os.Getenv("SMTP_PORT"),
+		SMTPUsername: os.Getenv("SMTP_USERNAME"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		FromEmail:    os.Getenv("FROM_EMAIL"),
+	}
+
 	userService := services.NewUserService(repo)
 
-	userHandler := handlers.NewUserHandler(userService)
+	userHandler := handlers.NewUserHandler(userService, &emailConfig)
 
 	router := gin.Default()
 

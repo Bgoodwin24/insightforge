@@ -15,19 +15,32 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type Mailer interface {
+	SendVerificationEmail(email, username, verificationLink string) error
+}
+
+type EmailConfig struct {
+	SMTPServer   string
+	SMTPPort     string
+	SMTPUsername string
+	SMTPPassword string
+	FromEmail    string
+}
+
 var (
 	// Simple in-memory store for rate limiting
-	ipAttemptMap = make(map[string]*ipAttempt)
+	ipAttemptMap = make(map[string]*IPAttempt)
 	ipMutex      = &sync.Mutex{}
 )
 
-type ipAttempt struct {
+type IPAttempt struct {
 	count    int
 	lastSeen time.Time
 }
 
 type UserHandler struct {
 	userService *services.UserService
+	mailer      Mailer
 	emailConfig struct {
 		smtpServer   string
 		smtpPort     string
@@ -43,7 +56,7 @@ type RegisterRequest struct {
 	Password string
 }
 
-func NewUserHandler(userService *services.UserService) *UserHandler {
+func NewUserHandler(userService *services.UserService, mailer Mailer) *UserHandler {
 	SMTP_SERVER := os.Getenv("SMTP_SERVER")
 	SMTP_PORT := os.Getenv("SMTP_PORT")
 	SMTP_USERNAME := os.Getenv("SMTP_USERNAME")
@@ -52,6 +65,7 @@ func NewUserHandler(userService *services.UserService) *UserHandler {
 
 	return &UserHandler{
 		userService: userService,
+		mailer:      mailer,
 		emailConfig: struct {
 			smtpServer   string
 			smtpPort     string
@@ -75,7 +89,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 	ip := c.ClientIP()
 
 	// Check rate limiting
-	if checkIPRate(ip) {
+	if CheckIPRate(ip) {
 		// Log the attempt
 		logger.Logger.Printf("SECURITY: Rate limit exceeded for registration attempts from IP: %s", ip)
 		c.JSON(400, gin.H{"error": "Too many registration attempts. Please try again later."})
@@ -113,37 +127,38 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	// Password strength
-	hasUppercase := false
-	hasLowercase := false
-	hasDigit := false
-	hasSpecial := false
+	// App Password strength check (skip if it's an app password)
+	if !IsAppPassword(request.Password) {
+		hasUppercase := false
+		hasLowercase := false
+		hasDigit := false
+		hasSpecial := false
+		hasLength := len(request.Password) >= 8
 
-	hasLength := len(request.Password) >= 8
+		for _, char := range request.Password {
+			if char >= 'A' && char <= 'Z' {
+				hasUppercase = true
+			}
 
-	for _, char := range request.Password {
-		if char >= 'A' && char <= 'Z' {
-			hasUppercase = true
+			if char >= 'a' && char <= 'z' {
+				hasLowercase = true
+			}
+
+			if char >= '0' && char <= '9' {
+				hasDigit = true
+			}
+
+			if (char >= '!' && char <= '/') || (char >= ':' && char <= '@') ||
+				(char >= '[' && char <= '`') || (char >= '{' && char <= '~') {
+				hasSpecial = true
+			}
 		}
 
-		if char >= 'a' && char <= 'z' {
-			hasLowercase = true
+		// Check all password requirements
+		if !hasUppercase || !hasLowercase || !hasDigit || !hasSpecial || !hasLength {
+			c.JSON(400, gin.H{"error": "Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 digit, 1 special character, and be at least 8 characters long"})
+			return
 		}
-
-		if char >= '0' && char <= '9' {
-			hasDigit = true
-		}
-
-		if (char >= '!' && char <= '/') || (char >= ':' && char <= '@') ||
-			(char >= '[' && char <= '`') || (char >= '{' && char <= '~') {
-			hasSpecial = true
-		}
-	}
-
-	// Check all password requirements
-	if !hasUppercase || !hasLowercase || !hasDigit || !hasSpecial || !hasLength {
-		c.JSON(400, gin.H{"error": "Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 digit, 1 special character, and be at least 8 characters long"})
-		return
 	}
 
 	// Create a pending user
@@ -158,7 +173,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 
 	// Send verification email
 	verificationLink := fmt.Sprintf("https://%s/verify?token=%s", SMTP_SERVER, pendingUser.Token)
-	err = h.sendVerificationEmail(pendingUser.Email, pendingUser.Username, verificationLink)
+	err = h.mailer.SendVerificationEmail(pendingUser.Email, pendingUser.Username, verificationLink)
 	if err != nil {
 		logger.Logger.Printf("ERROR: Failed to send verification email: %s", err.Error())
 		c.JSON(500, gin.H{"error": "Failed to send verification email, please try again"})
@@ -175,7 +190,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 	})
 }
 
-func checkIPRate(ip string) bool {
+func CheckIPRate(ip string) bool {
 	// Note: In a production environment, this would use Redis or a database
 	// for distributed tracking and persistence, and would include more
 	// sophisticated tracking like browser fingerprinting.
@@ -195,13 +210,13 @@ func checkIPRate(ip string) bool {
 
 	attempt, exists := ipAttemptMap[ip]
 	if !exists {
-		ipAttemptMap[ip] = &ipAttempt{count: 1, lastSeen: now}
+		ipAttemptMap[ip] = &IPAttempt{count: 1, lastSeen: now}
 		return false
 	}
 
 	// Reset if outside window
 	if now.Sub(attempt.lastSeen) > windowDuration {
-		ipAttemptMap[ip] = &ipAttempt{count: 1, lastSeen: now}
+		ipAttemptMap[ip] = &IPAttempt{count: 1, lastSeen: now}
 		return false
 	}
 
@@ -214,7 +229,7 @@ func checkIPRate(ip string) bool {
 }
 
 // Send an email with the verification link
-func (h *UserHandler) sendVerificationEmail(email, username, verificationLink string) error {
+func (ec *EmailConfig) SendVerificationEmail(email, username, verificationLink string) error {
 	// Email message
 	subject := "Verify your account"
 	body := fmt.Sprintf(`
@@ -238,11 +253,11 @@ func (h *UserHandler) sendVerificationEmail(email, username, verificationLink st
 		body)
 
 	// Connect to SMTP server
-	auth := smtp.PlainAuth("", h.emailConfig.smtpUsername, h.emailConfig.smtpPassword, h.emailConfig.smtpServer)
-	addr := h.emailConfig.smtpServer + ":" + h.emailConfig.smtpPort
+	auth := smtp.PlainAuth("", ec.SMTPUsername, ec.SMTPPassword, ec.SMTPServer)
+	addr := ec.SMTPServer + ":" + ec.SMTPPort
 
 	// Send email
-	err := smtp.SendMail(addr, auth, h.emailConfig.fromEmail, []string{email}, message)
+	err := smtp.SendMail(addr, auth, ec.FromEmail, []string{email}, message)
 	if err != nil {
 		return err
 	}
@@ -280,4 +295,13 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	} else {
 		c.JSON(200, gin.H{"message": "Email verified successfully. You can now log in."})
 	}
+}
+
+// Helper function to determine if the password is an app password
+func IsAppPassword(password string) bool {
+	// Remove spaces from the password
+	password = strings.ReplaceAll(password, " ", "")
+
+	// Check for the length of the password (Google app passwords are 16 characters long)
+	return len(password) == 16
 }

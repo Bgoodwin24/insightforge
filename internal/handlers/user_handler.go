@@ -4,28 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/smtp"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Bgoodwin24/insightforge/internal/email"
 	"github.com/Bgoodwin24/insightforge/internal/services"
 	"github.com/Bgoodwin24/insightforge/logger"
 	"github.com/gin-gonic/gin"
 )
-
-type Mailer interface {
-	SendVerificationEmail(email, username, verificationLink string) error
-}
-
-type EmailConfig struct {
-	SMTPServer   string
-	SMTPPort     string
-	SMTPUsername string
-	SMTPPassword string
-	FromEmail    string
-}
 
 var (
 	// Simple in-memory store for rate limiting
@@ -40,14 +28,7 @@ type IPAttempt struct {
 
 type UserHandler struct {
 	userService *services.UserService
-	mailer      Mailer
-	emailConfig struct {
-		smtpServer   string
-		smtpPort     string
-		smtpUsername string
-		smtpPassword string
-		fromEmail    string
-	}
+	mailer      email.Mailer
 }
 
 type RegisterRequest struct {
@@ -56,29 +37,10 @@ type RegisterRequest struct {
 	Password string
 }
 
-func NewUserHandler(userService *services.UserService, mailer Mailer) *UserHandler {
-	SMTP_SERVER := os.Getenv("SMTP_SERVER")
-	SMTP_PORT := os.Getenv("SMTP_PORT")
-	SMTP_USERNAME := os.Getenv("SMTP_USERNAME")
-	SMTP_PASSWORD := os.Getenv("SMTP_PASSWORD")
-	FROM_EMAIL := os.Getenv("FROM_EMAIL")
-
+func NewUserHandler(userService *services.UserService, mailer email.Mailer) *UserHandler {
 	return &UserHandler{
 		userService: userService,
 		mailer:      mailer,
-		emailConfig: struct {
-			smtpServer   string
-			smtpPort     string
-			smtpUsername string
-			smtpPassword string
-			fromEmail    string
-		}{
-			smtpServer:   SMTP_SERVER,
-			smtpPort:     SMTP_PORT,
-			smtpUsername: SMTP_USERNAME,
-			smtpPassword: SMTP_PASSWORD,
-			fromEmail:    FROM_EMAIL,
-		},
 	}
 }
 
@@ -226,43 +188,6 @@ func CheckIPRate(ip string) bool {
 
 	// Check if over limit
 	return attempt.count > maxAttempts
-}
-
-// Send an email with the verification link
-func (ec *EmailConfig) SendVerificationEmail(email, username, verificationLink string) error {
-	// Email message
-	subject := "Verify your account"
-	body := fmt.Sprintf(`
-<html>
-	<body>
-		<p>Hello %s,</p>
-		<p>Please verify your account by clicking the link below:</p>
-		<p><a href="%s">%s</a></p>
-		<p>The link will expire in 24 hours.</p>
-		<p>If you didn't register, please ignore this email.</p>
-		<br>
-		<p>— The InsightForge Team</p>
-	</body>
-</html>
-`, username, verificationLink, verificationLink)
-	message := []byte("To: " + email + "\r\n" +
-		"Subject: " + subject + "\r\n" +
-		"MIME-version: 1.0;\r\n" +
-		"Content-Type: text/html; charset=\"UTF-8\";\r\n" +
-		"\r\n" +
-		body)
-
-	// Connect to SMTP server
-	auth := smtp.PlainAuth("", ec.SMTPUsername, ec.SMTPPassword, ec.SMTPServer)
-	addr := ec.SMTPServer + ":" + ec.SMTPPort
-
-	// Send email
-	err := smtp.SendMail(addr, auth, ec.FromEmail, []string{email}, message)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // Add a new handler for verification

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/Bgoodwin24/insightforge/internal/database"
+	"github.com/Bgoodwin24/insightforge/internal/email"
 	"github.com/Bgoodwin24/insightforge/internal/handlers"
 	"github.com/Bgoodwin24/insightforge/internal/services"
 	"github.com/Bgoodwin24/insightforge/logger"
@@ -14,10 +15,6 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
-
-type Mailer interface {
-	SendVerificationEmail(email, username, verificationLink string) error
-}
 
 func main() {
 	// Initialize logger
@@ -60,7 +57,7 @@ func main() {
 	}
 
 	// Set up email configuration (you can load these from environment variables)
-	emailConfig := handlers.EmailConfig{
+	emailConfig := email.EmailConfig{
 		SMTPServer:   os.Getenv("SMTP_HOST"),
 		SMTPPort:     os.Getenv("SMTP_PORT"),
 		SMTPUsername: os.Getenv("SMTP_USERNAME"),
@@ -68,9 +65,17 @@ func main() {
 		FromEmail:    os.Getenv("FROM_EMAIL"),
 	}
 
+	mailer := email.NewMailer(
+		emailConfig.SMTPServer,
+		emailConfig.SMTPPort,
+		emailConfig.SMTPUsername,
+		emailConfig.SMTPPassword,
+		emailConfig.FromEmail,
+	)
+
 	userService := services.NewUserService(repo)
 
-	userHandler := handlers.NewUserHandler(userService, &emailConfig)
+	userHandler := handlers.NewUserHandler(userService, mailer)
 
 	router := gin.Default()
 

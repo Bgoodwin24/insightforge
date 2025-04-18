@@ -22,7 +22,12 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type MockMailer struct{}
+type MockMailer struct {
+	Called              bool
+	LastEmail           string
+	LastUsername        string
+	LastVerificationURL string
+}
 
 func (m *MockMailer) SendVerificationEmail(email, username, verificationLink string) error {
 	// Mock the email sending without actually sending it
@@ -30,7 +35,10 @@ func (m *MockMailer) SendVerificationEmail(email, username, verificationLink str
 	if email == "" || username == "" || verificationLink == "" {
 		return fmt.Errorf("invalid parameters")
 	}
-	// Simulating success
+	m.Called = true
+	m.LastEmail = email
+	m.LastUsername = username
+	m.LastVerificationURL = verificationLink
 	return nil
 }
 

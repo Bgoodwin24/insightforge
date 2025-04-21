@@ -1,0 +1,271 @@
+package handlers
+
+import (
+	"net/http"
+	"os"
+	"strconv"
+	"time"
+
+	"github.com/Bgoodwin24/insightforge/internal/database"
+	"github.com/Bgoodwin24/insightforge/internal/services"
+	"github.com/Bgoodwin24/insightforge/logger"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/joho/godotenv"
+)
+
+type Dataset struct {
+	ID          uuid.UUID `json:"id"`
+	UserID      uuid.UUID `json:"user_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Public      bool      `json:"public"`
+}
+
+type DatasetHandler struct {
+	Service *services.DatasetService
+}
+
+func NewDatasetHandler(service *services.DatasetService) *DatasetHandler {
+	return &DatasetHandler{
+		Service: service,
+	}
+}
+
+func (h *DatasetHandler) checkDatasetOwnership(c *gin.Context, datasetID uuid.UUID) (*database.Dataset, bool) {
+	userID, ok := getUserIDFromContext(c)
+	if !ok {
+		return nil, false
+	}
+
+	dataset, err := h.Service.GetDatasetByIDForUser(c, userID, datasetID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "dataset not found"})
+		return nil, false
+	}
+
+	// Check if dataset belongs to the user
+	if dataset.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized"})
+		return nil, false
+	}
+
+	return &dataset, true
+}
+
+func (h *DatasetHandler) CreateDataset(c *gin.Context) {
+	var input struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+		return
+	}
+
+	if input.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "dataset name is required"})
+		return
+	}
+
+	userID, ok := getUserIDFromContext(c)
+	if !ok {
+		return
+	}
+
+	dataset, err := h.Service.CreateDataset(c, userID, input.Name, input.Description)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create dataset"})
+		return
+	}
+	dataset.CreatedAt = time.Now()
+	dataset.UpdatedAt = time.Now()
+
+	c.JSON(http.StatusCreated, dataset)
+}
+
+func (h *DatasetHandler) ListDatasets(c *gin.Context) {
+	userID, ok := getUserIDFromContext(c)
+	if !ok {
+		return
+	}
+
+	limitStr := c.DefaultQuery("limit", "10")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, _ := strconv.Atoi(limitStr)
+	if limit > 1000 {
+		limit = 1000
+	}
+	offset, _ := strconv.Atoi(offsetStr)
+	if offset < 0 {
+		offset = 0
+	}
+
+	datasets, err := h.Service.ListDatasetsForUser(c, userID, int32(limit), int32(offset))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list datasets"})
+		return
+	}
+
+	c.JSON(http.StatusOK, datasets)
+}
+
+func (h *DatasetHandler) SearchDataSets(c *gin.Context) {
+	userID, ok := getUserIDFromContext(c)
+	if !ok {
+		return
+	}
+
+	search := c.DefaultQuery("search", "")
+	limitStr := c.DefaultQuery("limit", "10")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, _ := strconv.Atoi(limitStr)
+	if limit > 1000 {
+		limit = 1000
+	}
+	offset, _ := strconv.Atoi(offsetStr)
+	if offset < 0 {
+		offset = 0
+	}
+
+	datasets, err := h.Service.SearchDatasetByName(c, userID, search, int32(limit), int32(offset))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "search failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, datasets)
+}
+
+func getUserIDFromContext(c *gin.Context) (uuid.UUID, bool) {
+	userIDStr := c.GetString("user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user session"})
+		return uuid.Nil, false
+	}
+
+	return userID, true
+}
+
+func (h *DatasetHandler) UploadDataset(c *gin.Context) {
+	err := godotenv.Load(".env")
+	if err != nil {
+		logger.Logger.Fatalf("Failed to load .env file: %v", err)
+	}
+
+	userID, ok := getUserIDFromContext(c)
+	if !ok {
+		return
+	}
+
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file upload failed"})
+		return
+	}
+	defer file.Close()
+
+	limitSizeStr := os.Getenv("MAX_UPLOAD_SIZE")
+	if limitSizeStr == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "MAX_UPLOAD_SIZE is not set in .env"})
+		return
+	}
+	limitSize, err := strconv.ParseInt(limitSizeStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid MAX_UPLOAD_SIZE setting"})
+		return
+	}
+
+	if header.Size > limitSize {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file too large"})
+		return
+	}
+
+	dataset, err := h.Service.UploadDataset(c, userID, header.Filename, file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to upload dataset"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, dataset)
+}
+
+func (h *DatasetHandler) GetDatasetByID(c *gin.Context) {
+	idStr := c.Param("id")
+	datasetID, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	dataset, authorized := h.checkDatasetOwnership(c, datasetID)
+	if !authorized {
+		return
+	}
+
+	c.JSON(http.StatusOK, dataset)
+}
+
+func (h *DatasetHandler) DeleteDatasetsByID(c *gin.Context) {
+	idStr := c.Param("id")
+	datasetID, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	dataset, authorized := h.checkDatasetOwnership(c, datasetID)
+	if !authorized {
+		return
+	}
+
+	err = h.Service.DeleteDataset(c, datasetID, dataset.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete dataset"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "dataset deleted"})
+}
+
+func (h *DatasetHandler) UpdateDataset(c *gin.Context) {
+	idStr := c.Param("id")
+	datasetID, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	var input struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+		return
+	}
+
+	if input.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "dataset name is required"})
+		return
+	}
+
+	_, authorized := h.checkDatasetOwnership(c, datasetID)
+	if !authorized {
+		return
+	}
+
+	updated, err := h.Service.UpdateDataset(c, datasetID, input.Name, input.Description)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, updated)
+}

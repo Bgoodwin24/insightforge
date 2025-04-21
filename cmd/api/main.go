@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/Bgoodwin24/insightforge/internal/database"
 	"github.com/Bgoodwin24/insightforge/internal/email"
@@ -32,6 +33,7 @@ func main() {
 	dbPass := os.Getenv("DB_PASSWORD")
 	dbName := os.Getenv("DB_NAME")
 	dbPort := os.Getenv("DB_PORT")
+	dbMaxUpload := os.Getenv("MAX_UPLOAD_SIZE")
 
 	// Create DSN string
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
@@ -73,10 +75,6 @@ func main() {
 		emailConfig.FromEmail,
 	)
 
-	userService := services.NewUserService(repo)
-
-	userHandler := handlers.NewUserHandler(userService, mailer)
-
 	router := gin.Default()
 
 	// Health check route
@@ -84,15 +82,49 @@ func main() {
 		c.JSON(200, gin.H{"status": "OK"})
 	})
 
-	// Registration and email verification routes
-	router.POST("/register", userHandler.RegisterUser)
-	router.GET("/verify", userHandler.VerifyEmail)
+	// Max dataset upload
+	uploadLimit, err := strconv.ParseInt(dbMaxUpload, 10, 64)
+	if err != nil {
+		logger.Logger.Fatalf("Invalid MAX_UPLOAD_SIZE: %v", err)
+	}
+
+	if uploadLimit == 0 {
+		uploadLimit = 50 << 20
+	}
+
+	router.MaxMultipartMemory = uploadLimit
+
+	// User Service routes
+	userService := services.NewUserService(repo)
+	userHandler := handlers.NewUserHandler(userService, mailer)
+	userGroup := router.Group("/user")
+	{
+		userGroup.POST("/register", userHandler.RegisterUser)
+		userGroup.GET("/verify", userHandler.VerifyEmail)
+		userGroup.POST("/login", userHandler.LoginUser)
+	}
+
+	// Dataset routes
+	datasetService := services.NewDatasetService(repo)
+	datasetHandler := handlers.NewDatasetHandler(datasetService)
+	datasetGroup := router.Group("/datasets")
+	{
+		datasetGroup.POST("/upload", datasetHandler.UploadDataset)
+		datasetGroup.GET("/", datasetHandler.ListDatasets)
+		datasetGroup.GET("/:id", datasetHandler.GetDatasetByID)
+		datasetGroup.DELETE("/:id", datasetHandler.DeleteDatasetsByID)
+		datasetGroup.PUT("/:id", datasetHandler.UpdateDataset)
+		datasetGroup.POST("/", datasetHandler.CreateDataset)
+		datasetGroup.GET("/search", datasetHandler.SearchDataSets)
+	}
 
 	// Get the port from environment or default to 8080
 	port := os.Getenv("API_PORT")
 	if port == "" {
 		port = "8080"
 	}
+
+	log.Printf("InsightForge API running on port %s", port)
 
 	// Start the Gin server
 	if err := router.Run(":" + port); err != nil {

@@ -9,7 +9,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/Bgoodwin24/insightforge/internal/auth"
 	"github.com/Bgoodwin24/insightforge/internal/database"
 	"github.com/Bgoodwin24/insightforge/internal/email"
 	"github.com/Bgoodwin24/insightforge/internal/handlers"
@@ -74,8 +76,10 @@ func TestSendVerificationEmail(t *testing.T) {
 
 	logger.Init()
 
+	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
+
 	userService := services.NewUserService(testRepo)
-	userHandler := handlers.NewUserHandler(userService, mailer)
+	userHandler := handlers.NewUserHandler(userService, mailer, jwtManager)
 
 	router := gin.Default()
 	router.POST("/register", userHandler.RegisterUser)

@@ -10,7 +10,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/Bgoodwin24/insightforge/internal/auth"
 	"github.com/Bgoodwin24/insightforge/internal/database"
 	"github.com/Bgoodwin24/insightforge/internal/handlers"
 	"github.com/Bgoodwin24/insightforge/internal/services"
@@ -84,10 +86,13 @@ func TestRegisterUser_Success(t *testing.T) {
 	// Mock mailer so no real email is sent
 	mockMailer := &MockMailer{}
 
+	// Initialize JWT Token
+	jwtManager := auth.NewJWTManager("test-secret", time.Hour)
+
 	// Initialize logger and services
 	logger.Init()
 	userService := services.NewUserService(testRepo)
-	userHandler := handlers.NewUserHandler(userService, mockMailer)
+	userHandler := handlers.NewUserHandler(userService, mockMailer, jwtManager)
 
 	// Setup test router
 	router := gin.Default()

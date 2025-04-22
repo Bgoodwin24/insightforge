@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
+	"github.com/Bgoodwin24/insightforge/internal/auth"
 	"github.com/Bgoodwin24/insightforge/internal/database"
 	"github.com/Bgoodwin24/insightforge/internal/email"
 	"github.com/Bgoodwin24/insightforge/internal/handlers"
@@ -25,6 +27,17 @@ func main() {
 	err := godotenv.Load(".env")
 	if err != nil {
 		logger.Logger.Fatalf("Failed to load .env file: %v", err)
+	}
+
+	// Initialize JWT Manager
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		logger.Logger.Fatal("JWT_SECRET is not set in environment variables")
+	}
+	tokenDuration := 24 * time.Hour
+	jwtManager := &auth.JWTManager{
+		SecretKey:     jwtSecret,
+		TokenDuration: tokenDuration,
 	}
 
 	//Retrieve environment variables
@@ -96,18 +109,20 @@ func main() {
 
 	// User Service routes
 	userService := services.NewUserService(repo)
-	userHandler := handlers.NewUserHandler(userService, mailer)
+	userHandler := handlers.NewUserHandler(userService, mailer, jwtManager)
 	userGroup := router.Group("/user")
 	{
 		userGroup.POST("/register", userHandler.RegisterUser)
 		userGroup.GET("/verify", userHandler.VerifyEmail)
 		userGroup.POST("/login", userHandler.LoginUser)
+		userGroup.GET("/profile", auth.AuthMiddleware(jwtManager), userHandler.GetMyProfile)
 	}
 
 	// Dataset routes
 	datasetService := services.NewDatasetService(repo)
 	datasetHandler := handlers.NewDatasetHandler(datasetService)
 	datasetGroup := router.Group("/datasets")
+	datasetGroup.Use(auth.AuthMiddleware(jwtManager))
 	{
 		datasetGroup.POST("/upload", datasetHandler.UploadDataset)
 		datasetGroup.GET("/", datasetHandler.ListDatasets)

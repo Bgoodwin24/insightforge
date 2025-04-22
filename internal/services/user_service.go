@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/Bgoodwin24/insightforge/internal/auth"
@@ -49,7 +50,8 @@ func (s *UserService) CreateUser(username, email, password string) (*database.Us
 	return &user, nil
 }
 
-func (s *UserService) LoginUser(email, password string) (*database.User, error) {
+func (s *UserService) LoginUser(email, password string) (*database.User, string, error) {
+	jwtSecret := os.Getenv("JWT_SECRET")
 	const maxAttempts = 5
 	const lockDuration = 15 * time.Minute
 
@@ -57,14 +59,14 @@ func (s *UserService) LoginUser(email, password string) (*database.User, error) 
 	user, err := s.Repo.Queries.GetUserByEmail(context.Background(), email)
 	if err != nil {
 		logger.Logger.Println("ERROR: Invalid email or password:", err)
-		return nil, fmt.Errorf("invalid email or password")
+		return nil, "", fmt.Errorf("invalid email or password")
 	}
 
 	// Check if account is locked
 	if user.LockedUntil.Valid && time.Now().Before(user.LockedUntil.Time) {
 		lockedFor := time.Until(user.LockedUntil.Time).Round(time.Minute)
 		logger.Logger.Println("ERROR: Account is locked, try again in", lockedFor)
-		return nil, fmt.Errorf("account is locked, try again in %v", lockedFor)
+		return nil, "", fmt.Errorf("account is locked, try again in %v", lockedFor)
 	}
 
 	// Verify password
@@ -95,22 +97,29 @@ func (s *UserService) LoginUser(email, password string) (*database.User, error) 
 
 		if err != nil {
 			logger.Logger.Println("ERROR: Error updating login attempts:", err)
-			return nil, fmt.Errorf("error updating login attempts: %w", err)
+			return nil, "", fmt.Errorf("error updating login attempts: %w", err)
 		}
 
 		logger.Logger.Println("ERROR: Invalid email or password")
-		return nil, fmt.Errorf("invalid email or password")
+		return nil, "", fmt.Errorf("invalid email or password")
 	}
 
 	// Password is correct - reset login attempts
 	err = s.Repo.Queries.ResetLoginAttempts(context.Background(), user.ID)
 	if err != nil {
 		logger.Logger.Println("ERROR: Error resetting login attempts:", err)
-		return nil, fmt.Errorf("error resetting login attempts: %w", err)
+		return nil, "", fmt.Errorf("error resetting login attempts: %w", err)
+	}
+
+	jwtManager := auth.NewJWTManager(jwtSecret, time.Hour*24)
+	token, err := jwtManager.Generate(user.ID, user.Email)
+	if err != nil {
+		logger.Logger.Println("ERROR: Failed to generate JWT:", err)
+		return nil, "", fmt.Errorf("failed to generate JWT")
 	}
 
 	// Return authenticated user
-	return &user, nil
+	return &user, token, nil
 }
 
 func (s *UserService) ActivateUser(token string) error {
@@ -123,6 +132,16 @@ func (s *UserService) ActivateUser(token string) error {
 	if time.Now().After(pending.ExpiresAt) {
 		logger.Logger.Println("ERROR: Token has expired")
 		return fmt.Errorf("token has expired")
+	}
+
+	// Check if user already exists before activation
+	existingUser, err := s.Repo.Queries.GetUserByEmail(context.Background(), pending.Email)
+	if err == nil && existingUser.ID != uuid.Nil {
+		logger.Logger.Println("ERROR: User already exists")
+		return fmt.Errorf("user already exists")
+	} else if err != nil && err != sql.ErrNoRows {
+		logger.Logger.Println("ERROR: Unexpected error checking for existing user:", err)
+		return fmt.Errorf("error checking for existing user: %v", err)
 	}
 
 	_, err = s.Repo.Queries.CreateUser(context.Background(), database.CreateUserParams{

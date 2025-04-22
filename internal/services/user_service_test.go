@@ -112,10 +112,18 @@ func TestLoginUser(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	user, err := userService.LoginUser(email, password)
+	user, token, err := userService.LoginUser(email, password)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	assert.Equal(t, email, user.Email)
+
+	assert.NotEmpty(t, token, "JWT token should not be empty")
+
+	jwtManager := auth.NewJWTManager(os.Getenv("JWT_SECRET"), time.Hour*24)
+	claims, err := jwtManager.Parse(token)
+	require.NoError(t, err)
+	assert.Equal(t, userID.String(), claims["user_id"].(string), "JWT should contain correct user ID")
+	assert.WithinDuration(t, time.Now().UTC(), claims["exp"].(time.Time), time.Minute, "JWT expiration should be valid")
 }
 
 func TestActivateUser(t *testing.T) {

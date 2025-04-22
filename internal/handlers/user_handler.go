@@ -9,10 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Bgoodwin24/insightforge/internal/auth"
 	"github.com/Bgoodwin24/insightforge/internal/email"
 	"github.com/Bgoodwin24/insightforge/internal/services"
 	"github.com/Bgoodwin24/insightforge/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 var (
@@ -27,8 +29,9 @@ type IPAttempt struct {
 }
 
 type UserHandler struct {
-	userService *services.UserService
-	mailer      email.Mailer
+	UserService *services.UserService
+	Mailer      email.Mailer
+	JWTManager  *auth.JWTManager
 }
 
 type RegisterRequest struct {
@@ -37,10 +40,11 @@ type RegisterRequest struct {
 	Password string
 }
 
-func NewUserHandler(userService *services.UserService, mailer email.Mailer) *UserHandler {
+func NewUserHandler(userService *services.UserService, mailer email.Mailer, jwtManager *auth.JWTManager) *UserHandler {
 	return &UserHandler{
-		userService: userService,
-		mailer:      mailer,
+		UserService: userService,
+		Mailer:      mailer,
+		JWTManager:  jwtManager,
 	}
 }
 
@@ -124,7 +128,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 	}
 
 	// Create a pending user
-	pendingUser, err := h.userService.RegisterPendingUser(request.Username, request.Email, request.Password)
+	pendingUser, err := h.UserService.RegisterPendingUser(request.Username, request.Email, request.Password)
 	if err != nil {
 		// Log security event
 		logger.Logger.Printf("SECURITY: Failed registration attempt from IP: %s, Email: %s, Error: %s",
@@ -135,7 +139,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 
 	// Send verification email
 	verificationLink := fmt.Sprintf("https://%s/verify?token=%s", SMTP_SERVER, pendingUser.Token)
-	err = h.mailer.SendVerificationEmail(pendingUser.Email, pendingUser.Username, verificationLink)
+	err = h.Mailer.SendVerificationEmail(pendingUser.Email, pendingUser.Username, verificationLink)
 	if err != nil {
 		logger.Logger.Printf("ERROR: Failed to send verification email: %s", err.Error())
 		c.JSON(500, gin.H{"error": "Failed to send verification email, please try again"})
@@ -199,14 +203,14 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	}
 
 	// Check if token exists and is valid
-	user, err := h.userService.Repo.Queries.GetPendingUserByToken(context.Background(), token)
+	user, err := h.UserService.Repo.Queries.GetPendingUserByToken(context.Background(), token)
 	if err != nil {
 		c.JSON(400, gin.H{"error": "Verification link is invalid or has expired"})
 		return
 	}
 
 	// Activate the user
-	err = h.userService.ActivateUser(token)
+	err = h.UserService.ActivateUser(token)
 	if err != nil {
 		logger.Logger.Printf("ERROR: Failed to activate user %s: %s", user.ID, err.Error())
 		c.JSON(500, gin.H{"error": "Failed to verify account"})
@@ -242,7 +246,7 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.LoginUser(req.Email, req.Password)
+	user, token, err := h.UserService.LoginUser(req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -255,5 +259,28 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 			"username": user.Username,
 			"email":    user.Email,
 		},
+		"token": token,
 	})
+}
+
+func (h *UserHandler) GetMyProfile(c *gin.Context) {
+	rawID, exists := c.Get("userID") // set by JWT middleware
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userID, ok := rawID.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	user, err := h.UserService.Repo.Queries.GetUserByID(context.Background(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }

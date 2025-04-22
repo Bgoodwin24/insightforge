@@ -96,7 +96,7 @@ func TestLoginUser(t *testing.T) {
 
 	userService := services.NewUserService(testRepo)
 
-	email := "test@example.com"
+	email := fmt.Sprintf("user_%d@example.com", time.Now().UnixNano())
 	password := "P@ssw0rd!"
 	hashedPassword, _ := auth.HashPassword(password)
 	userID := uuid.New()
@@ -123,7 +123,9 @@ func TestLoginUser(t *testing.T) {
 	claims, err := jwtManager.Parse(token)
 	require.NoError(t, err)
 	assert.Equal(t, userID.String(), claims["user_id"].(string), "JWT should contain correct user ID")
-	assert.WithinDuration(t, time.Now().UTC(), claims["exp"].(time.Time), time.Minute, "JWT expiration should be valid")
+	expFloat := claims["exp"].(float64)
+	expTime := time.Unix(int64(expFloat), 0)
+	assert.WithinDuration(t, time.Now().Add(24*time.Hour), expTime, time.Minute)
 }
 
 func TestActivateUser(t *testing.T) {
@@ -158,7 +160,7 @@ func TestActivateUser(t *testing.T) {
 
 func TestRegisterPendingUser(t *testing.T) {
 	username := "testuser"
-	email := "test@example.com"
+	email := fmt.Sprintf("user_%d@example.com", time.Now().UnixNano())
 	password := "P@ssw0rd!"
 	hashedPassword, err := auth.HashPassword(password)
 	if err != nil {

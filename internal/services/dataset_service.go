@@ -73,10 +73,10 @@ func (s *DatasetService) DeleteDataset(ctx context.Context, id, userID uuid.UUID
 
 func (s *DatasetService) SearchDatasetByName(ctx context.Context, userID uuid.UUID, search string, limit, offset int32) ([]database.Dataset, error) {
 	return s.Repo.Queries.SearchDatasetByName(ctx, database.SearchDatasetByNameParams{
-		UserID: userID,
-		Search: sql.NullString{String: search, Valid: search != ""},
-		Limit:  limit,
-		Offset: offset,
+		UserID:  userID,
+		Column2: search,
+		Limit:   limit,
+		Offset:  offset,
 	})
 }
 

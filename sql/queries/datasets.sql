@@ -36,7 +36,9 @@ WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id);
 
 -- name: SearchDatasetByName :many
 SELECT * FROM datasets
-WHERE user_id = sqlc.arg(user_id) 
-  AND (sqlc.arg(search) IS NULL OR name ILIKE '%' || sqlc.arg(search) || '%')
+WHERE user_id = $1
+  AND (
+    $2::text IS NULL OR name ILIKE '%' || $2::text || '%'
+  )
 ORDER BY created_at DESC
-LIMIT $1 OFFSET $2;
+LIMIT $3 OFFSET $4;

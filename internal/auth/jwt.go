@@ -96,7 +96,7 @@ func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 		}
 
 		// Store claims in context
-		c.Set("userID", claims.UserID)
+		c.Set("user_id", claims.UserID.String())
 		c.Set("userEmail", claims.Email)
 		c.Next()
 	}

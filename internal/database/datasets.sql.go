@@ -139,25 +139,27 @@ func (q *Queries) ListDatasetsForUser(ctx context.Context, arg ListDatasetsForUs
 
 const searchDatasetByName = `-- name: SearchDatasetByName :many
 SELECT id, user_id, name, description, created_at, updated_at, public FROM datasets
-WHERE user_id = $3 
-  AND ($4 IS NULL OR name ILIKE '%' || $4 || '%')
+WHERE user_id = $1
+  AND (
+    $2::text IS NULL OR name ILIKE '%' || $2::text || '%'
+  )
 ORDER BY created_at DESC
-LIMIT $1 OFFSET $2
+LIMIT $3 OFFSET $4
 `
 
 type SearchDatasetByNameParams struct {
-	Limit  int32
-	Offset int32
-	UserID uuid.UUID
-	Search interface{}
+	UserID  uuid.UUID
+	Column2 string
+	Limit   int32
+	Offset  int32
 }
 
 func (q *Queries) SearchDatasetByName(ctx context.Context, arg SearchDatasetByNameParams) ([]Dataset, error) {
 	rows, err := q.db.QueryContext(ctx, searchDatasetByName,
+		arg.UserID,
+		arg.Column2,
 		arg.Limit,
 		arg.Offset,
-		arg.UserID,
-		arg.Search,
 	)
 	if err != nil {
 		return nil, err

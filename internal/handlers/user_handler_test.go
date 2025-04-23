@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,9 +15,9 @@ import (
 	"github.com/Bgoodwin24/insightforge/internal/database"
 	"github.com/Bgoodwin24/insightforge/internal/handlers"
 	"github.com/Bgoodwin24/insightforge/internal/services"
+	"github.com/Bgoodwin24/insightforge/internal/testutils"
 	"github.com/Bgoodwin24/insightforge/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/lib/pq"
@@ -47,41 +46,18 @@ func (m *MockMailer) SendVerificationEmail(email, username, verificationLink str
 var testDB *sql.DB
 
 func TestMain(m *testing.M) {
-	testDB = setupDB()
+	testDB = testutils.SetupDB()
 	defer testDB.Close()
 
 	testRepo := database.NewRepository(testDB)
-	cleanDB(testRepo)
+	testutils.CleanDB(testRepo)
 
 	os.Exit(m.Run())
 }
 
-func setupDB() *sql.DB {
-	err := godotenv.Load("../../.env")
-	if err != nil {
-		log.Fatalf("Failed to load .env file: %v", err)
-	}
-
-	dbHost := os.Getenv("DB_HOST")
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
-	dbPort := os.Getenv("DB_PORT")
-
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		dbHost, dbPort, dbUser, dbPass, dbName)
-
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		log.Fatalf("failed to connect to test database: %v", err)
-	}
-
-	return db
-}
-
 func TestRegisterUser_Success(t *testing.T) {
 	testRepo := database.NewRepository(testDB)
-	cleanDB(testRepo)
+	testutils.CleanDB(testRepo)
 
 	// Mock mailer so no real email is sent
 	mockMailer := &MockMailer{}
@@ -134,7 +110,7 @@ func TestRegisterUser_IPRateLimit(t *testing.T) {
 
 func TestVerifyEmail_Success(t *testing.T) {
 	testRepo := database.NewRepository(testDB)
-	cleanDB(testRepo)
+	testutils.CleanDB(testRepo)
 
 	logger.Init()
 	userService := services.NewUserService(testRepo)
@@ -168,16 +144,4 @@ func TestVerifyEmail_Success(t *testing.T) {
 		t.Fatal("Failed to count pending users:", err)
 	}
 	assert.Equal(t, 0, count)
-}
-
-func cleanDB(db *database.Repository) {
-	_, err := db.Exec("TRUNCATE users RESTART IDENTITY CASCADE")
-	if err != nil {
-		log.Fatalf("failed to clean test database: %v", err)
-	}
-
-	_, err = testDB.Exec("TRUNCATE pending_users RESTART IDENTITY CASCADE")
-	if err != nil {
-		log.Fatalf("failed to clean test database: %v", err)
-	}
 }

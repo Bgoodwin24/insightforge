@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -34,8 +36,8 @@ func NewDatasetHandler(service *services.DatasetService) *DatasetHandler {
 	}
 }
 
-func (h *DatasetHandler) checkDatasetOwnership(c *gin.Context, datasetID uuid.UUID) (*database.Dataset, bool) {
-	userID, ok := getUserIDFromContext(c)
+func (h *DatasetHandler) CheckDatasetOwnership(c *gin.Context, datasetID uuid.UUID) (*database.Dataset, bool) {
+	userID, ok := GetUserIDFromContext(c)
 	if !ok {
 		return nil, false
 	}
@@ -71,7 +73,7 @@ func (h *DatasetHandler) CreateDataset(c *gin.Context) {
 		return
 	}
 
-	userID, ok := getUserIDFromContext(c)
+	userID, ok := GetUserIDFromContext(c)
 	if !ok {
 		return
 	}
@@ -88,7 +90,7 @@ func (h *DatasetHandler) CreateDataset(c *gin.Context) {
 }
 
 func (h *DatasetHandler) ListDatasets(c *gin.Context) {
-	userID, ok := getUserIDFromContext(c)
+	userID, ok := GetUserIDFromContext(c)
 	if !ok {
 		return
 	}
@@ -115,7 +117,7 @@ func (h *DatasetHandler) ListDatasets(c *gin.Context) {
 }
 
 func (h *DatasetHandler) SearchDataSets(c *gin.Context) {
-	userID, ok := getUserIDFromContext(c)
+	userID, ok := GetUserIDFromContext(c)
 	if !ok {
 		return
 	}
@@ -135,6 +137,7 @@ func (h *DatasetHandler) SearchDataSets(c *gin.Context) {
 
 	datasets, err := h.Service.SearchDatasetByName(c, userID, search, int32(limit), int32(offset))
 	if err != nil {
+		log.Printf("Error in SearchDatasetByName: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "search failed"})
 		return
 	}
@@ -142,7 +145,7 @@ func (h *DatasetHandler) SearchDataSets(c *gin.Context) {
 	c.JSON(http.StatusOK, datasets)
 }
 
-func getUserIDFromContext(c *gin.Context) (uuid.UUID, bool) {
+func GetUserIDFromContext(c *gin.Context) (uuid.UUID, bool) {
 	userIDStr := c.GetString("user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
@@ -159,7 +162,7 @@ func (h *DatasetHandler) UploadDataset(c *gin.Context) {
 		logger.Logger.Fatalf("Failed to load .env file: %v", err)
 	}
 
-	userID, ok := getUserIDFromContext(c)
+	userID, ok := GetUserIDFromContext(c)
 	if !ok {
 		return
 	}
@@ -204,7 +207,7 @@ func (h *DatasetHandler) GetDatasetByID(c *gin.Context) {
 		return
 	}
 
-	dataset, authorized := h.checkDatasetOwnership(c, datasetID)
+	dataset, authorized := h.CheckDatasetOwnership(c, datasetID)
 	if !authorized {
 		return
 	}
@@ -220,7 +223,7 @@ func (h *DatasetHandler) DeleteDatasetsByID(c *gin.Context) {
 		return
 	}
 
-	dataset, authorized := h.checkDatasetOwnership(c, datasetID)
+	dataset, authorized := h.CheckDatasetOwnership(c, datasetID)
 	if !authorized {
 		return
 	}
@@ -242,6 +245,12 @@ func (h *DatasetHandler) UpdateDataset(c *gin.Context) {
 		return
 	}
 
+	dataset, err := h.Service.Repo.Queries.GetDatasetByID(c, datasetID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "dataset not found"})
+		return
+	}
+
 	var input struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -256,8 +265,21 @@ func (h *DatasetHandler) UpdateDataset(c *gin.Context) {
 		return
 	}
 
-	_, authorized := h.checkDatasetOwnership(c, datasetID)
-	if !authorized {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authorized"})
+		return
+	}
+
+	userIDParsed, err := uuid.Parse(userID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse user_id"})
+		return
+	}
+
+	if dataset.UserID != userIDParsed {
+		log.Printf("User is not authorized to update dataset %s", datasetID)
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
@@ -267,5 +289,20 @@ func (h *DatasetHandler) UpdateDataset(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, updated)
+	resp := Dataset{
+		ID:          updated.ID,
+		Name:        updated.Name,
+		Description: nullStringToStr(updated.Description),
+		CreatedAt:   updated.CreatedAt,
+		UpdatedAt:   updated.UpdatedAt,
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func nullStringToStr(ns sql.NullString) string {
+	if ns.Valid {
+		return ns.String
+	}
+	return ""
 }

@@ -58,6 +58,70 @@ func (q *Queries) CreateDataset(ctx context.Context, arg CreateDatasetParams) (D
 	return i, err
 }
 
+const createDatasetField = `-- name: CreateDatasetField :exec
+INSERT INTO dataset_fields (id, dataset_id, name, data_type, description, created_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type CreateDatasetFieldParams struct {
+	ID          uuid.UUID
+	DatasetID   uuid.UUID
+	Name        string
+	DataType    string
+	Description sql.NullString
+	CreatedAt   time.Time
+}
+
+func (q *Queries) CreateDatasetField(ctx context.Context, arg CreateDatasetFieldParams) error {
+	_, err := q.db.ExecContext(ctx, createDatasetField,
+		arg.ID,
+		arg.DatasetID,
+		arg.Name,
+		arg.DataType,
+		arg.Description,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const createDatasetRecord = `-- name: CreateDatasetRecord :exec
+INSERT INTO dataset_records (id, dataset_id, created_at, updated_at)
+VALUES ($1, $2, $3, $4)
+`
+
+type CreateDatasetRecordParams struct {
+	ID        uuid.UUID
+	DatasetID uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) CreateDatasetRecord(ctx context.Context, arg CreateDatasetRecordParams) error {
+	_, err := q.db.ExecContext(ctx, createDatasetRecord,
+		arg.ID,
+		arg.DatasetID,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const createRecordValue = `-- name: CreateRecordValue :exec
+INSERT INTO record_values (record_id, field_id, value)
+VALUES ($1, $2, $3)
+`
+
+type CreateRecordValueParams struct {
+	RecordID uuid.UUID
+	FieldID  uuid.UUID
+	Value    sql.NullString
+}
+
+func (q *Queries) CreateRecordValue(ctx context.Context, arg CreateRecordValueParams) error {
+	_, err := q.db.ExecContext(ctx, createRecordValue, arg.RecordID, arg.FieldID, arg.Value)
+	return err
+}
+
 const deleteDataset = `-- name: DeleteDataset :exec
 DELETE FROM datasets
 WHERE id = $1 AND user_id = $2
@@ -91,6 +155,104 @@ func (q *Queries) GetDatasetByID(ctx context.Context, id uuid.UUID) (Dataset, er
 		&i.Public,
 	)
 	return i, err
+}
+
+const getDatasetFields = `-- name: GetDatasetFields :many
+SELECT id, dataset_id, name, data_type, description, created_at FROM dataset_fields
+WHERE dataset_id = $1
+ORDER BY name
+`
+
+func (q *Queries) GetDatasetFields(ctx context.Context, datasetID uuid.UUID) ([]DatasetField, error) {
+	rows, err := q.db.QueryContext(ctx, getDatasetFields, datasetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DatasetField
+	for rows.Next() {
+		var i DatasetField
+		if err := rows.Scan(
+			&i.ID,
+			&i.DatasetID,
+			&i.Name,
+			&i.DataType,
+			&i.Description,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getDatasetRecords = `-- name: GetDatasetRecords :many
+SELECT id, dataset_id, created_at, updated_at FROM dataset_records
+WHERE dataset_id = $1
+ORDER BY created_at
+`
+
+func (q *Queries) GetDatasetRecords(ctx context.Context, datasetID uuid.UUID) ([]DatasetRecord, error) {
+	rows, err := q.db.QueryContext(ctx, getDatasetRecords, datasetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DatasetRecord
+	for rows.Next() {
+		var i DatasetRecord
+		if err := rows.Scan(
+			&i.ID,
+			&i.DatasetID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecordValuesByRecordID = `-- name: GetRecordValuesByRecordID :many
+SELECT record_id, field_id, value FROM record_values
+WHERE record_id = $1
+`
+
+func (q *Queries) GetRecordValuesByRecordID(ctx context.Context, recordID uuid.UUID) ([]RecordValue, error) {
+	rows, err := q.db.QueryContext(ctx, getRecordValuesByRecordID, recordID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RecordValue
+	for rows.Next() {
+		var i RecordValue
+		if err := rows.Scan(&i.RecordID, &i.FieldID, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDatasetsForUser = `-- name: ListDatasetsForUser :many

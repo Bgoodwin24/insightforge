@@ -42,3 +42,29 @@ WHERE user_id = $1
   )
 ORDER BY created_at DESC
 LIMIT $3 OFFSET $4;
+
+-- name: CreateDatasetField :exec
+INSERT INTO dataset_fields (id, dataset_id, name, data_type, description, created_at)
+VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: CreateDatasetRecord :exec
+INSERT INTO dataset_records (id, dataset_id, created_at, updated_at)
+VALUES ($1, $2, $3, $4);
+
+-- name: CreateRecordValue :exec
+INSERT INTO record_values (record_id, field_id, value)
+VALUES ($1, $2, $3);
+
+-- name: GetDatasetFields :many
+SELECT * FROM dataset_fields
+WHERE dataset_id = $1
+ORDER BY name;
+
+-- name: GetDatasetRecords :many
+SELECT * FROM dataset_records
+WHERE dataset_id = $1
+ORDER BY created_at;
+
+-- name: GetRecordValuesByRecordID :many
+SELECT * FROM record_values
+WHERE record_id = $1;

@@ -182,4 +182,29 @@ func TestUploadDataset(t *testing.T) {
 	dataset, err := svc.UploadDataset(context.Background(), user.ID, "upload.csv", reader)
 	require.NoError(t, err)
 	assert.Equal(t, "upload.csv", dataset.Name)
+
+	// Check dataset fields
+	fields, err := repo.Queries.GetDatasetFields(context.Background(), dataset.ID)
+	require.NoError(t, err)
+	assert.Len(t, fields, 2)
+
+	// Check inferred types
+	fieldTypes := map[string]string{}
+	for _, f := range fields {
+		fieldTypes[f.Name] = f.DataType
+	}
+	assert.Equal(t, "integer", fieldTypes["id"])
+	assert.Equal(t, "integer", fieldTypes["value"])
+
+	// Check dataset records
+	records, err := repo.Queries.GetDatasetRecords(context.Background(), dataset.ID)
+	require.NoError(t, err)
+	assert.Len(t, records, 2)
+
+	// Check record values
+	for _, record := range records {
+		values, err := repo.Queries.GetRecordValuesByRecordID(context.Background(), record.ID)
+		require.NoError(t, err)
+		assert.Len(t, values, 2) // id and value fields
+	}
 }

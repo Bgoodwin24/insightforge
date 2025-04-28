@@ -7,7 +7,7 @@ import (
 )
 
 // Histogram computes the counts of values within evenly spaced bins.
-func Histogram(data []float64, numBins int) ([]float64, []int, error) {
+func Histogram(data []float64, numBins int) (binEdges []float64, binCounts []int, err error) {
 	if len(data) == 0 {
 		return nil, nil, fmt.Errorf("no data points provided")
 	}
@@ -34,12 +34,12 @@ func Histogram(data []float64, numBins int) ([]float64, []int, error) {
 	}
 
 	binWidth := (maxVal - minVal) / float64(numBins)
-	binEdges := make([]float64, numBins+1)
+	binEdges = make([]float64, numBins+1)
 	for i := 0; i <= numBins; i++ {
 		binEdges[i] = minVal + binWidth*float64(i)
 	}
 
-	binCounts := make([]int, numBins)
+	binCounts = make([]int, numBins)
 	for _, v := range data {
 		idx := int((v - minVal) / binWidth)
 		// Edge case: max value falls exactly on upper edge
@@ -52,7 +52,7 @@ func Histogram(data []float64, numBins int) ([]float64, []int, error) {
 }
 
 // KDEApproximate estimates a smooth density curve over the data using a simple Gaussian kernel.
-func KDEApproximate(data []float64, numPoints int, bandwidth float64) ([]float64, []float64, error) {
+func KDEApproximate(data []float64, numPoints int, bandwidth float64) (xs []float64, ys []float64, err error) {
 	if len(data) == 0 {
 		return nil, nil, fmt.Errorf("no data points provided")
 	}
@@ -68,13 +68,13 @@ func KDEApproximate(data []float64, numPoints int, bandwidth float64) ([]float64
 	maxVal := data[len(data)-1]
 
 	// Generate evenly spaced xs across the data
-	xs := make([]float64, numPoints)
+	xs = make([]float64, numPoints)
 	step := (maxVal - minVal) / float64(numPoints-1)
 	for i := range xs {
 		xs[i] = minVal + float64(i)*step
 	}
 
-	ys := make([]float64, numPoints)
+	ys = make([]float64, numPoints)
 	n := float64(len(data))
 
 	for i, x := range xs {
@@ -89,9 +89,9 @@ func KDEApproximate(data []float64, numPoints int, bandwidth float64) ([]float64
 }
 
 // FormatHistogramForChartJS formats histogram output into Chart.js-friendly labels and counts.
-func FormatHistogramForChartJS(binEdges []float64, binCounts []int) ([]string, []int) {
+func FormatHistogramForChartJS(binEdges []float64, binCounts []int) (labels []string, counts []int) {
 	n := len(binCounts)
-	labels := make([]string, n)
+	labels = make([]string, n)
 	for i := 0; i < n; i++ {
 		labels[i] = fmt.Sprintf("[%.2f, %.2f]", binEdges[i], binEdges[i+1])
 	}
@@ -99,9 +99,9 @@ func FormatHistogramForChartJS(binEdges []float64, binCounts []int) ([]string, [
 }
 
 // FormatKDEForChartJS formats KDE output into Chart.js-friendly labels and densities.
-func FormatKDEForChartJS(xs []float64, ys []float64) ([]string, []float64) {
+func FormatKDEForChartJS(xs []float64, ys []float64) (labels []string, densities []float64) {
 	n := len(xs)
-	labels := make([]string, n)
+	labels = make([]string, n)
 	for i := 0; i < n; i++ {
 		labels[i] = fmt.Sprintf("%.2f", xs[i])
 	}

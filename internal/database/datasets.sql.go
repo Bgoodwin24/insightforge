@@ -137,6 +137,21 @@ func (q *Queries) DeleteDataset(ctx context.Context, arg DeleteDatasetParams) er
 	return err
 }
 
+const deleteDatasetField = `-- name: DeleteDatasetField :exec
+DELETE FROM dataset_fields
+WHERE id = $1 AND dataset_id = $2
+`
+
+type DeleteDatasetFieldParams struct {
+	ID        uuid.UUID
+	DatasetID uuid.UUID
+}
+
+func (q *Queries) DeleteDatasetField(ctx context.Context, arg DeleteDatasetFieldParams) error {
+	_, err := q.db.ExecContext(ctx, deleteDatasetField, arg.ID, arg.DatasetID)
+	return err
+}
+
 const getDatasetByID = `-- name: GetDatasetByID :one
 SELECT id, user_id, name, description, created_at, updated_at, public FROM datasets
 WHERE id = $1
@@ -153,6 +168,29 @@ func (q *Queries) GetDatasetByID(ctx context.Context, id uuid.UUID) (Dataset, er
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Public,
+	)
+	return i, err
+}
+
+const getDatasetField = `-- name: GetDatasetField :one
+SELECT id, dataset_id, name, data_type, description, created_at FROM dataset_fields WHERE id = $1 AND dataset_id = $2
+`
+
+type GetDatasetFieldParams struct {
+	ID        uuid.UUID
+	DatasetID uuid.UUID
+}
+
+func (q *Queries) GetDatasetField(ctx context.Context, arg GetDatasetFieldParams) (DatasetField, error) {
+	row := q.db.QueryRowContext(ctx, getDatasetField, arg.ID, arg.DatasetID)
+	var i DatasetField
+	err := row.Scan(
+		&i.ID,
+		&i.DatasetID,
+		&i.Name,
+		&i.DataType,
+		&i.Description,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -227,6 +265,83 @@ func (q *Queries) GetDatasetRecords(ctx context.Context, datasetID uuid.UUID) ([
 	return items, nil
 }
 
+const getFieldsByDatasetID = `-- name: GetFieldsByDatasetID :many
+SELECT id, name, data_type, description, created_at, dataset_id
+FROM dataset_fields
+WHERE dataset_id = $1
+ORDER BY created_at ASC
+`
+
+type GetFieldsByDatasetIDRow struct {
+	ID          uuid.UUID
+	Name        string
+	DataType    string
+	Description sql.NullString
+	CreatedAt   time.Time
+	DatasetID   uuid.UUID
+}
+
+func (q *Queries) GetFieldsByDatasetID(ctx context.Context, datasetID uuid.UUID) ([]GetFieldsByDatasetIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getFieldsByDatasetID, datasetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetFieldsByDatasetIDRow
+	for rows.Next() {
+		var i GetFieldsByDatasetIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.DataType,
+			&i.Description,
+			&i.CreatedAt,
+			&i.DatasetID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecordValuesByDatasetID = `-- name: GetRecordValuesByDatasetID :many
+SELECT record_id, field_id, value
+FROM record_values
+WHERE record_id IN (
+    SELECT id FROM dataset_records WHERE dataset_id = $1
+)
+`
+
+func (q *Queries) GetRecordValuesByDatasetID(ctx context.Context, datasetID uuid.UUID) ([]RecordValue, error) {
+	rows, err := q.db.QueryContext(ctx, getRecordValuesByDatasetID, datasetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RecordValue
+	for rows.Next() {
+		var i RecordValue
+		if err := rows.Scan(&i.RecordID, &i.FieldID, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRecordValuesByRecordID = `-- name: GetRecordValuesByRecordID :many
 SELECT record_id, field_id, value FROM record_values
 WHERE record_id = $1
@@ -242,6 +357,41 @@ func (q *Queries) GetRecordValuesByRecordID(ctx context.Context, recordID uuid.U
 	for rows.Next() {
 		var i RecordValue
 		if err := rows.Scan(&i.RecordID, &i.FieldID, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecordsByDatasetID = `-- name: GetRecordsByDatasetID :many
+SELECT id, dataset_id, created_at, updated_at
+FROM dataset_records
+WHERE dataset_id = $1
+ORDER BY created_at ASC
+`
+
+func (q *Queries) GetRecordsByDatasetID(ctx context.Context, datasetID uuid.UUID) ([]DatasetRecord, error) {
+	rows, err := q.db.QueryContext(ctx, getRecordsByDatasetID, datasetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DatasetRecord
+	for rows.Next() {
+		var i DatasetRecord
+		if err := rows.Scan(
+			&i.ID,
+			&i.DatasetID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -387,4 +537,33 @@ func (q *Queries) UpdateDataset(ctx context.Context, arg UpdateDatasetParams) (D
 		&i.Public,
 	)
 	return i, err
+}
+
+const updateDatasetRows = `-- name: UpdateDatasetRows :exec
+WITH updated AS (
+    UPDATE dataset_records
+    SET updated_at = $2
+    WHERE dataset_id = $1
+    RETURNING id
+)
+UPDATE record_values
+SET value = $3
+WHERE record_id IN (SELECT id FROM updated) AND field_id = $4
+`
+
+type UpdateDatasetRowsParams struct {
+	DatasetID uuid.UUID
+	UpdatedAt time.Time
+	Value     sql.NullString
+	FieldID   uuid.UUID
+}
+
+func (q *Queries) UpdateDatasetRows(ctx context.Context, arg UpdateDatasetRowsParams) error {
+	_, err := q.db.ExecContext(ctx, updateDatasetRows,
+		arg.DatasetID,
+		arg.UpdatedAt,
+		arg.Value,
+		arg.FieldID,
+	)
+	return err
 }

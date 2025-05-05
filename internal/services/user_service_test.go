@@ -53,16 +53,18 @@ func TestCreateUser_Success(t *testing.T) {
 
 	logger.Init()
 	userService := services.NewUserService(testRepo)
+	email := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+	username := fmt.Sprintf("user%d", time.Now().UnixNano())
 
-	user, err := userService.CreateUser("testuser", "test@example.com", "password123")
+	user, err := userService.CreateUser(username, email, "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NoError(t, err)
 	assert.NotNil(t, user)
-	assert.Equal(t, "testuser", user.Username)
-	assert.Equal(t, "test@example.com", user.Email)
+	assert.Equal(t, username, user.Username)
+	assert.Equal(t, email, user.Email)
 	assert.WithinDuration(t, time.Now().UTC(), user.CreatedAt.UTC(), time.Second*2)
 }
 
@@ -101,13 +103,14 @@ func TestLoginUser(t *testing.T) {
 	hashedPassword, _ := auth.HashPassword(password)
 	userID := uuid.New()
 	now := time.Now().UTC()
+	username := fmt.Sprintf("user%d", time.Now().UnixNano())
 
 	_, err := testRepo.Queries.CreateUser(context.Background(), database.CreateUserParams{
 		ID:           userID,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 		Email:        email,
-		Username:     "testuser",
+		Username:     username,
 		PasswordHash: hashedPassword,
 	})
 	require.NoError(t, err)
@@ -137,8 +140,10 @@ func TestActivateUser(t *testing.T) {
 	logger.Init()
 
 	userService := services.NewUserService(testRepo)
+	email := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+	username := fmt.Sprintf("user%d", time.Now().UnixNano())
 
-	pendingUser, err := userService.RegisterPendingUser("testuser", "test@example.com", "P@ssw0rd!")
+	pendingUser, err := userService.RegisterPendingUser(username, email, "P@ssw0rd!")
 	if err != nil {
 		t.Logf("Failed to register pending user: %v", err)
 	}
@@ -159,7 +164,7 @@ func TestActivateUser(t *testing.T) {
 }
 
 func TestRegisterPendingUser(t *testing.T) {
-	username := "testuser"
+	username := fmt.Sprintf("user%d", time.Now().UnixNano())
 	email := fmt.Sprintf("user_%d@example.com", time.Now().UnixNano())
 	password := "P@ssw0rd!"
 	hashedPassword, err := auth.HashPassword(password)

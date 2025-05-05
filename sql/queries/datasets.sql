@@ -68,3 +68,41 @@ ORDER BY created_at;
 -- name: GetRecordValuesByRecordID :many
 SELECT * FROM record_values
 WHERE record_id = $1;
+
+
+-- name: GetFieldsByDatasetID :many
+SELECT id, name, data_type, description, created_at, dataset_id
+FROM dataset_fields
+WHERE dataset_id = $1
+ORDER BY created_at ASC;
+
+-- name: GetRecordsByDatasetID :many
+SELECT id, dataset_id, created_at, updated_at
+FROM dataset_records
+WHERE dataset_id = $1
+ORDER BY created_at ASC;
+
+-- name: GetRecordValuesByDatasetID :many
+SELECT record_id, field_id, value
+FROM record_values
+WHERE record_id IN (
+    SELECT id FROM dataset_records WHERE dataset_id = $1
+);
+
+-- name: UpdateDatasetRows :exec
+WITH updated AS (
+    UPDATE dataset_records
+    SET updated_at = $2
+    WHERE dataset_id = $1
+    RETURNING id
+)
+UPDATE record_values
+SET value = $3
+WHERE record_id IN (SELECT id FROM updated) AND field_id = $4;
+
+-- name: GetDatasetField :one
+SELECT * FROM dataset_fields WHERE id = $1 AND dataset_id = $2;
+
+-- name: DeleteDatasetField :exec
+DELETE FROM dataset_fields
+WHERE id = $1 AND dataset_id = $2;

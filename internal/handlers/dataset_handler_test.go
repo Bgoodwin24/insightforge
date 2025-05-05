@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -26,6 +27,7 @@ func TestCreateDataset_Success(t *testing.T) {
 
 	jwtManager := auth.NewJWTManager(os.Getenv("JWT_SECRET"), time.Minute*15)
 	db := testutils.SetupTestRepo()
+	testutils.CleanDB(db)
 	service := services.NewDatasetService(db)
 	handler := handlers.NewDatasetHandler(service)
 
@@ -247,30 +249,48 @@ func TestUpdateDataset_Forbidden(t *testing.T) {
 	service := services.NewDatasetService(db)
 	handler := handlers.NewDatasetHandler(service)
 
-	owner := testutils.CreateTestUser(t, db, "owner@example.com")
-	intruder := testutils.CreateTestUser(t, db, "intruder@example.com")
+	// Create owner and intruder users
+	ownerEmail := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+	intruderEmail := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+
+	// Create users in the database
+	owner := testutils.CreateTestUser(t, db, ownerEmail)
+	intruder := testutils.CreateTestUser(t, db, intruderEmail)
+
+	// Create dataset for the owner
 	dataset := testutils.CreateTestDataset(t, db, owner.ID, "Secret", "Don't touch this")
 
+	// Generate a JWT token for the intruder
 	jwtManager := auth.NewJWTManager(os.Getenv("JWT_SECRET"), time.Minute*15)
 	token, err := jwtManager.Generate(intruder.ID, intruder.Email)
 	require.NoError(t, err)
 
+	// Set up the router with the auth middleware
 	router := gin.Default()
 	router.Use(auth.AuthMiddleware(jwtManager))
 	router.PUT("/datasets/:id", handler.UpdateDataset)
 
+	// Prepare the payload for the update
 	payload := map[string]string{
 		"name":        "Hack Attempt",
 		"description": "Hacked",
 	}
 	body, _ := json.Marshal(payload)
 
+	// Make the HTTP PUT request
 	req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/datasets/%s", dataset.ID), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
+	// Record the response
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
 
+	// Assert that the response status is Forbidden (403)
 	assert.Equal(t, http.StatusForbidden, resp.Code)
+
+	// Optionally: Add assertions to check that the dataset has not been modified
+	updatedDataset, err := db.Queries.GetDatasetByID(context.Background(), dataset.ID)
+	require.NoError(t, err)
+	assert.Equal(t, dataset.Name, updatedDataset.Name) // Verify name wasn't changed
 }

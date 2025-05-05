@@ -1,6 +1,7 @@
 package descriptives
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -35,27 +36,24 @@ func Median(data []float64) (float64, error) {
 	return sortedData[mid], nil
 }
 
-func Mode(data []float64) ([]float64, error) {
+func Mode(data []string) (string, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("data is empty")
+		return "", errors.New("no data provided")
 	}
-	counts := make(map[float64]int)
+
+	freq := make(map[string]int)
 	maxCount := 0
-	for _, num := range data {
-		counts[num]++
-		if counts[num] > maxCount {
-			maxCount = counts[num]
+	var mode string
+
+	for _, v := range data {
+		freq[v]++
+		if freq[v] > maxCount {
+			maxCount = freq[v]
+			mode = v
 		}
 	}
 
-	var modes []float64
-	for num, count := range counts {
-		if count == maxCount {
-			modes = append(modes, num)
-		}
-	}
-
-	return modes, nil
+	return mode, nil
 }
 
 func StdDev(data []float64) (float64, error) {
@@ -72,20 +70,23 @@ func StdDev(data []float64) (float64, error) {
 
 func Variance(data []float64) (float64, error) {
 	if len(data) == 0 {
-		return 0, fmt.Errorf("data is empty")
+		return 0, errors.New("no data provided")
 	}
 
-	sumSquaredDiff := 0.0
-	mean, err := Mean(data)
-	if err != nil {
-		return 0.0, err
-	}
+	var sum, mean, variance float64
+	n := float64(len(data))
 
-	for _, val := range data {
-		diff := val - mean
-		sumSquaredDiff += diff * diff
+	for _, value := range data {
+		sum += value
 	}
-	return sumSquaredDiff / float64(len(data)-1), nil
+	mean = sum / n
+
+	for _, value := range data {
+		variance += (value - mean) * (value - mean)
+	}
+	variance /= (n - 1)
+
+	return variance, nil
 }
 
 func Min(data []float64) (float64, error) {

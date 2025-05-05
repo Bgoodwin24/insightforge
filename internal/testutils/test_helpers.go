@@ -115,3 +115,55 @@ func CleanDB(db *database.Repository) {
 		log.Fatalf("failed to clean test database: %v", err)
 	}
 }
+
+func InsertTestRecord(t *testing.T, repo *database.Repository, datasetID, fieldID uuid.UUID, value string) {
+	recordID := uuid.New()
+	now := time.Now()
+
+	_, err := repo.DB.Exec(`
+        INSERT INTO dataset_records (id, dataset_id, created_at, updated_at)
+        VALUES ($1, $2, $3, $4)
+    `, recordID, datasetID, now, now)
+	require.NoError(t, err)
+
+	_, err = repo.DB.Exec(`
+        INSERT INTO record_values (record_id, field_id, value)
+        VALUES ($1, $2, $3)
+    `, recordID, fieldID, value)
+	require.NoError(t, err)
+}
+
+func InsertTestField(t *testing.T, repo *database.Repository, datasetID, fieldID uuid.UUID, name, dataType string) {
+	t.Helper()
+	err := repo.Queries.CreateDatasetField(context.Background(), database.CreateDatasetFieldParams{
+		ID:        fieldID,
+		DatasetID: datasetID,
+		Name:      name,
+		DataType:  dataType,
+		CreatedAt: time.Now(),
+	})
+	require.NoError(t, err)
+}
+
+func InsertTestValueWithRecordID(t *testing.T, repo *database.Repository, datasetID, recordID, fieldID uuid.UUID, value string) {
+	now := time.Now()
+
+	if value == "" {
+		fmt.Println("Empty value detected, skipping insertion")
+		return
+	}
+
+	// Insert dataset_record only if it doesn't exist
+	_, err := repo.DB.Exec(`
+		INSERT INTO dataset_records (id, dataset_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (id) DO NOTHING
+	`, recordID, datasetID, now, now)
+	require.NoError(t, err)
+
+	_, err = repo.DB.Exec(`
+		INSERT INTO record_values (record_id, field_id, value)
+		VALUES ($1, $2, $3)
+	`, recordID, fieldID, value)
+	require.NoError(t, err)
+}

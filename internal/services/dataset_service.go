@@ -12,6 +12,7 @@ import (
 
 	"github.com/Bgoodwin24/insightforge/internal/database"
 	"github.com/Bgoodwin24/insightforge/logger"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -23,6 +24,118 @@ func NewDatasetService(repo *database.Repository) *DatasetService {
 	return &DatasetService{
 		Repo: repo,
 	}
+}
+
+func (s *DatasetService) UpdateDatasetRows(ctx context.Context, params database.UpdateDatasetRowsParams) error {
+	err := s.Repo.Queries.UpdateDatasetRows(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to update dataset rows: %w", err)
+	}
+	return nil
+}
+
+func (s *DatasetService) DeleteFieldFromDataset(c *gin.Context, datasetID uuid.UUID, fieldID uuid.UUID) error {
+	// Call your database layer to delete the field from the dataset
+	params := database.DeleteDatasetFieldParams{
+		ID:        fieldID,
+		DatasetID: datasetID,
+	}
+
+	// Perform the deletion
+	err := s.Repo.Queries.DeleteDatasetField(context.Background(), params)
+	return err
+}
+
+func (s *DatasetService) GetDatasetHeaders(ctx context.Context, datasetID uuid.UUID) ([]string, error) {
+	rows, err := s.GetDatasetRows(ctx, datasetID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("dataset is empty")
+	}
+
+	// Get the fields for the dataset (we expect these to be the header names)
+	fields, err := s.Repo.Queries.GetFieldsByDatasetID(ctx, datasetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fields: %w", err)
+	}
+
+	// Ensure that we return the field names in the correct order
+	headers := make([]string, len(fields))
+	for i, field := range fields {
+		headers[i] = field.Name
+	}
+
+	return headers, nil
+}
+
+func (s *DatasetService) GetDatasetByID(ctx context.Context, id uuid.UUID) (database.Dataset, error) {
+	dataset, err := s.Repo.Queries.GetDatasetByID(ctx, id)
+	if err != nil {
+		return database.Dataset{}, fmt.Errorf("error fetching dataset: %w", err)
+	}
+	return dataset, nil
+}
+
+func (s *DatasetService) GetDatasetRows(ctx context.Context, datasetID uuid.UUID) ([][]string, error) {
+	// 1. Load fields (columns)
+	fields, err := s.Repo.Queries.GetFieldsByDatasetID(ctx, datasetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fields: %w", err)
+	}
+
+	// 2. Load records (rows)
+	records, err := s.Repo.Queries.GetRecordsByDatasetID(ctx, datasetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get records: %w", err)
+	}
+
+	if len(fields) == 0 || len(records) == 0 {
+		return [][]string{}, nil // empty dataset
+	}
+
+	// 3. Build a map of fieldID to column index
+	fieldOrder := make(map[uuid.UUID]int)
+	for idx, field := range fields {
+		fieldOrder[field.ID] = idx
+	}
+
+	// 4. Now fetch all record_values for the dataset
+	values, err := s.Repo.Queries.GetRecordValuesByDatasetID(ctx, datasetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get record values: %w", err)
+	}
+
+	// 5. Organize values by record
+	recordValueMap := make(map[uuid.UUID]map[int]string)
+
+	for _, val := range values {
+		if _, ok := recordValueMap[val.RecordID]; !ok {
+			recordValueMap[val.RecordID] = make(map[int]string)
+		}
+		colIdx, ok := fieldOrder[val.FieldID]
+		if !ok {
+			continue // field missing
+		}
+		recordValueMap[val.RecordID][colIdx] = val.Value.String
+	}
+
+	// 6. Now reconstruct the [][]string
+	var rows [][]string
+	for _, record := range records {
+		row := make([]string, len(fields))
+		for idx := range fields {
+			if v, ok := recordValueMap[record.ID][idx]; ok {
+				row[idx] = v
+			} else {
+				row[idx] = ""
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	return rows, nil
 }
 
 func (s *DatasetService) CreateDataset(ctx context.Context, userID uuid.UUID, name, description string) (database.Dataset, error) {

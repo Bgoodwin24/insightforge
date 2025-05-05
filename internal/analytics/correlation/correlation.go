@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 type CorrelationResult struct {
@@ -71,6 +72,7 @@ func CorrelationMatrix(data [][]string, colIndices []int, method string) ([][]fl
 		for j := 0; j <= i; j++ {
 			var corr float64
 			var err error
+
 			switch method {
 			case "pearson":
 				corr, err = PearsonCorrelation(cols[i], cols[j])
@@ -100,7 +102,11 @@ func ExtractFloatColumns(data [][]string, colIndices []int) ([][]float64, error)
 			if colIdx >= len(row) {
 				return nil, fmt.Errorf("column index %d out of range", colIdx)
 			}
-			val, err := strconv.ParseFloat(row[colIdx], 64)
+			cleaned := strings.TrimSpace(row[colIdx])
+			if cleaned == "" {
+				return nil, fmt.Errorf("empty value at row: %v", row)
+			}
+			val, err := strconv.ParseFloat(cleaned, 64)
 			if err != nil {
 				return nil, fmt.Errorf("invalid float at row: %v", err)
 			}
@@ -151,7 +157,6 @@ func GenerateCorrelationLabels(colIndices []int, headers []string) [][]string {
 	n := len(colIndices)
 	result := make([][]string, n+1)
 
-	// Header row
 	headerRow := make([]string, n+1)
 	headerRow[0] = ""
 	for i, idx := range colIndices {
@@ -159,12 +164,11 @@ func GenerateCorrelationLabels(colIndices []int, headers []string) [][]string {
 	}
 	result[0] = headerRow
 
-	// Data rows with row labels
 	for i, idx := range colIndices {
 		row := make([]string, n+1)
 		row[0] = headers[idx]
 		for j := 1; j <= n; j++ {
-			row[j] = "" // filled later by visualization
+			row[j] = ""
 		}
 		result[i+1] = row
 	}

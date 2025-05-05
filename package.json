@@ -1,5 +1,26 @@
 {
   "dependencies": {
     "chart.js": "^4.4.8"
+  },
+  "name": "insightforge",
+  "description": "## Project Overview A web application that allows users to upload datasets and explore them through visualizations and analysis tools.",
+  "version": "1.0.0",
+  "main": "index.js",
+  "devDependencies": {
+    "@babel/core": "^7.27.1",
+    "@babel/preset-env": "^7.27.1",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "jest": {
+    "transform": {
+      "^.+\\.jsx?$": "babel-jest"
+    }
   }
 }

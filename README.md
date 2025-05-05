@@ -7,7 +7,7 @@ A web application that allows users to upload datasets and explore them through 
 ```mermaid
 graph TD
     A[React Components] --> B[State Management]
-    B --> C[Chart.js/D3.js]
+    B --> C[Chart.js]
     D[API Routes] --> E[Service Layer]
     E --> F[Data Access Layer]
     F --> G[PostgreSQL]
@@ -47,6 +47,7 @@ graph TD
 - SQLC (type-safe SQL) (v1.28.0 or later)
 - Testify (testing framework) (v1.10.0 or later)
 - HTTPTest (v2.2.0 or later)
+- Jest (NPM testing) (v29.7.0 or later)
 
 ## Features
 - Data upload and storage

@@ -1,0 +1,19 @@
+body {
+        margin: 0;
+        padding: 0;
+        font-family: Verdana;
+        background-color: #1c211f;
+        background-repeat: no-repeat;
+        background-position: center top;
+        background-size: contain;
+        min-height: 100vh;
+        overflow-y: auto;
+        color: white;
+      }
+    
+.app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 50px 20px;
+  text-align: center;
+}

@@ -1,0 +1,144 @@
+/* App.module.css */
+
+/* Global app styles */
+.app {
+  font-family: Verdana;
+}
+
+/* Header styles */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: #333;
+  color: white;
+  position: relative;
+  border-bottom: 2px solid #ddd; /* Line separating header from body */
+}
+
+.logoContainer {
+  display: flex;
+  justify-content: flex-start; /* Align logo to the left */
+  flex-grow: 0;
+  background-color: transparent;
+}
+
+.logo {
+  height: 180px;
+  width: auto;
+  opacity: 1;
+  margin-top: -40px;
+  filter: none;
+  -webkit-filter: none;
+}
+
+.titles {
+  display: flex;
+  flex-direction: column; /* Stack titles vertically */
+  align-items: center; /* Center titles horizontally */
+  justify-content: center;
+  flex-grow: 1; /* Allow titles to take up remaining space */
+  text-align: center;
+}
+
+.title {
+  font-size: 32px;
+  margin: 0;
+}
+
+.title2 {
+  font-size: 16px;
+  margin-top: 20px;
+}
+
+.buttonContainer {
+  display: flex;
+  justify-content: flex-end; /* Align buttons to the right */
+  gap: 10px;
+}
+
+.button {
+  padding: 10px 15px;
+  background-color: transparent;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.button:hover {
+  background-color: #8c8c8c;
+}
+
+/* Divider line */
+.divider {
+  height: 2px;
+  background-color: #ddd;
+  margin-top: 0px;
+}
+
+/* Main content styles */
+.mainContent {
+  text-align: center;
+  padding: 20px;
+}
+
+.accountMenu {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.accountButton {
+  padding: 10px 15px;
+  background-color: transparent;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.accountButton:hover {
+  background-color: #8c8c8c;
+}
+
+.dropdown {
+  position: absolute;
+  right: 0;
+  background-color: #333;
+  color: white;
+  border: 1px solid #555;
+  margin-top: 36px;
+  padding: 10px;
+  z-index: 1000;
+  min-width: 160px;
+  border-radius: 5px;
+}
+
+.dropdownItem {
+  font-size: 14px;
+  margin: 5px 0;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.dropdownItem:hover {
+  background-color: #8c8c8c;
+}
+
+.logoutButton {
+  background-color: #8c8c8c;
+  color: white;
+  border: none;
+  padding: 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.logoutButton:hover {
+  background-color: #a00;
+}
+

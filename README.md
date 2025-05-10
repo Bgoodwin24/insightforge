@@ -48,6 +48,7 @@ graph TD
 - Testify (testing framework) (v1.10.0 or later)
 - HTTPTest (v2.2.0 or later)
 - Jest (NPM testing) (v29.7.0 or later)
+- Babel (Babel-Jest testing) (v7.27.1 or later)
 
 ## Features
 - Data upload and storage
@@ -131,6 +132,14 @@ go install github.com/air-verse/air@latest
 - Chart.js
 ``` bash
 npm install chart.js
+```
+- Jest
+``` bash
+npm install --save-dev jest
+```
+- Babel
+``` bash
+npm install --save-dev babel-jest @babel/core @babel/preset-env @babel/preset-react
 ```
 - Godotenv
 ``` bash

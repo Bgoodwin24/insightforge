@@ -1,5 +1,5 @@
 /**
- * Transforms a map of group-value pairs into Chart.js format.
+ * Transforms a map of group-value pairs into Chart.js transform.
  *
  * @param {Object} data - The backend response (e.g., { "GroupA": 123, "GroupB": 456 }).
  * @param {String} datasetLabel - The label to display on the chart legend.
@@ -24,7 +24,7 @@ function transformGroupedDataToChartJS(data, datasetLabel = "Result") {
   }
 
 /**
- * Transforms a pivot table response into Chart.js format.
+ * Transforms a pivot table response into Chart.js transform.
  *
  * @param {Object} pivotTable - A nested object like:
  *   {
@@ -77,7 +77,7 @@ function randomRGBA() {
   }
 
 /**
- * Transforms the cleaned rows after missing values are dropped into Chart.js format.
+ * Transforms the cleaned rows after missing values are dropped into Chart.js transform.
  *
  * @param {Object} result - The backend response with `rows` (cleaned rows).
  * @param {String} datasetLabel - The label for the dataset.
@@ -97,7 +97,7 @@ function transformDroppedRowsToChartJS(result, datasetLabel = "Cleaned Dataset")
 }
 
 /**
- * Transforms the rows with filled missing values into Chart.js format.
+ * Transforms the rows with filled missing values into Chart.js transform.
  *
  * @param {Object} result - The backend response with `rows` (rows with missing values filled).
  * @param {String} datasetLabel - The label for the dataset.
@@ -117,7 +117,7 @@ function transformFilledMissingToChartJS(result, datasetLabel = "Dataset with Fi
 }
 
 /**
- * Transforms the rows after log transformation into Chart.js format.
+ * Transforms the rows after log transtransformion into Chart.js transform.
  *
  * @param {Object} result - The backend response with `rows` (log-transformed values).
  * @param {String} datasetLabel - The label for the dataset.
@@ -137,7 +137,7 @@ function transformLogTransformedToChartJS(result, datasetLabel = "Log-Transforme
 }
 
 /**
- * Transforms the rows after column normalization into Chart.js format.
+ * Transforms the rows after column normalization into Chart.js transform.
  *
  * @param {Object} result - The backend response with `rows` (normalized values).
  * @param {String} datasetLabel - The label for the dataset.
@@ -158,7 +158,7 @@ function transformNormalizedColumnToChartJS(result, datasetLabel = "Normalized D
 
 /**
  * Converts a StandardizeColumn API response (map of column name -> array of numbers)
- * into Chart.js compatible format.
+ * into Chart.js compatible transform.
  * 
  * Example input:
  * {
@@ -166,7 +166,7 @@ function transformNormalizedColumnToChartJS(result, datasetLabel = "Normalized D
  *   "colB": [-0.4, 0.0, 0.4]
  * }
  * 
- * Output format:
+ * Output transform:
  * {
  *   labels: [0, 1, 2],
  *   datasets: [
@@ -185,7 +185,7 @@ function transformNormalizedColumnToChartJS(result, datasetLabel = "Normalized D
  *   ]
  * }
  */
-function formatStandardizeColumnForChart(data) {
+function transformStandardizeColumnForChart(data) {
     const labels = Array.from(
       { length: Object.values(data)[0]?.length || 0 },
       (_, i) => i
@@ -206,7 +206,7 @@ function formatStandardizeColumnForChart(data) {
     return { labels, datasets };
   }
   
-function formatPearsonForChart(data) {
+function transformPearsonForChart(data) {
     return {
       labels: ["Pearson Correlation"],
       datasets: [
@@ -221,7 +221,7 @@ function formatPearsonForChart(data) {
     };
   }
 
-function formatSpearmanForChart(data) {
+function transformSpearmanForChart(data) {
     return {
       labels: ["Spearman Correlation"],
       datasets: [
@@ -236,7 +236,7 @@ function formatSpearmanForChart(data) {
     };
   }
   
-function formatCorrelationMatrixForChart(data) {
+function transformCorrelationMatrixForChart(data) {
     const rowLabels = Object.keys(data);
     const columnSet = new Set();
   
@@ -270,7 +270,7 @@ function formatCorrelationMatrixForChart(data) {
   }
   
 /**
- * Transforms the mean result into Chart.js format.
+ * Transforms the mean result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "mean": 20 }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -290,7 +290,7 @@ function transformMeanToChartJS(result, datasetLabel = "Mean") {
 }
 
 /**
- * Transforms the median result into Chart.js format.
+ * Transforms the median result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "median": 30 }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -310,7 +310,7 @@ function transformMedianToChartJS(result, datasetLabel = "Median") {
 }
 
 /**
- * Transforms the mode result into Chart.js format.
+ * Transforms the mode result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "mode": "red" }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -330,7 +330,7 @@ function transformModeToChartJS(result, datasetLabel = "Mode") {
 }
 
 /**
- * Transforms the standard deviation result into Chart.js format.
+ * Transforms the standard deviation result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "stddev": 5 }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -350,7 +350,7 @@ function transformStdDevToChartJS(result, datasetLabel = "Standard Deviation") {
 }
 
 /**
- * Transforms the variance result into Chart.js format.
+ * Transforms the variance result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "variance": 100 }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -370,7 +370,7 @@ function transformVarianceToChartJS(result, datasetLabel = "Variance") {
 }
 
 /**
- * Transforms the min result into Chart.js format.
+ * Transforms the min result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "min": 70 }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -390,7 +390,7 @@ function transformMinToChartJS(result, datasetLabel = "Min") {
 }
 
 /**
- * Transforms the max result into Chart.js format.
+ * Transforms the max result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "max": 100 }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -410,7 +410,7 @@ function transformMaxToChartJS(result, datasetLabel = "Max") {
 }
 
 /**
- * Transforms the range result into Chart.js format.
+ * Transforms the range result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "range": 40 }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -430,7 +430,7 @@ function transformRangeToChartJS(result, datasetLabel = "Range") {
 }
 
 /**
- * Transforms the sum result into Chart.js format.
+ * Transforms the sum result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "sum": 60 }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -450,7 +450,7 @@ function transformSumToChartJS(result, datasetLabel = "Sum") {
 }
 
 /**
- * Transforms the count result into Chart.js format.
+ * Transforms the count result into Chart.js transform.
  *
  * @param {Object} result - The backend response (e.g., { "count": 3 }).
  * @param {String} datasetLabel - The label for the dataset.
@@ -470,7 +470,7 @@ function transformCountToChartJS(result, datasetLabel = "Count") {
 }
 
 /**
- * Transforms the histogram result into Chart.js format.
+ * Transforms the histogram result into Chart.js transform.
  *
  * @param {Object} result - The backend response with `labels` and `counts`.
  * @param {String} datasetLabel - The label for the dataset.
@@ -491,7 +491,7 @@ function transformHistogramToChartJS(result, datasetLabel = "Histogram") {
 }
 
 /**
- * Transforms the KDE result into Chart.js format.
+ * Transforms the KDE result into Chart.js transform.
  *
  * @param {Object} result - The backend response with `labels` (x-values) and `densities` (y-values).
  * @param {String} datasetLabel - The label for the dataset.
@@ -535,7 +535,7 @@ function transformFilteredSortedDataToChartJS(result, headers) {
 }
 
 /**
- * Transforms the Z-score outlier indices into Chart.js format.
+ * Transforms the Z-score outlier indices into Chart.js transform.
  *
  * @param {Object} result - The backend response with outlier `indices`.
  * @param {Array} data - The original dataset.
@@ -560,7 +560,7 @@ function transformZScoreOutliersToChartJS(result, data) {
 }
 
 /**
- * Transforms the IQR outlier indices into Chart.js format.
+ * Transforms the IQR outlier indices into Chart.js transform.
  *
  * @param {Object} result - The backend response with outlier `indices`.
  * @param {Array} data - The original dataset.
@@ -585,7 +585,7 @@ function transformIQROutliersToChartJS(result, data) {
 }
 
 /**
- * Transforms the box plot data into Chart.js format.
+ * Transforms the box plot data into Chart.js transform.
  *
  * @param {Object} result - The backend response with `labels` and `values` for the box plot.
  * @returns {Object} - An object with `labels` and `datasets` for Chart.js.
@@ -612,10 +612,10 @@ export {
     transformFilledMissingToChartJS,
     transformLogTransformedToChartJS,
     transformNormalizedColumnToChartJS,
-    formatStandardizeColumnForChart,
-    formatPearsonForChart,
-    formatSpearmanForChart,
-    formatCorrelationMatrixForChart,
+    transformStandardizeColumnForChart,
+    transformPearsonForChart,
+    transformSpearmanForChart,
+    transformCorrelationMatrixForChart,
     transformMeanToChartJS,
     transformMedianToChartJS,
     transformModeToChartJS,

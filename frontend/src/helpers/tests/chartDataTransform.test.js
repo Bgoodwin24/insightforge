@@ -5,10 +5,10 @@ import {
     transformFilledMissingToChartJS,
     transformLogTransformedToChartJS,
     transformNormalizedColumnToChartJS,
-    formatStandardizeColumnForChart,
-    formatPearsonForChart,
-    formatSpearmanForChart,
-    formatCorrelationMatrixForChart,
+    transformStandardizeColumnForChart,
+    transformPearsonForChart,
+    transformSpearmanForChart,
+    transformCorrelationMatrixForChart,
     transformMeanToChartJS,
     transformMedianToChartJS,
     transformModeToChartJS,
@@ -93,12 +93,12 @@ describe("ChartJS Helpers", () => {
         expect(chartData.datasets[0].data).toEqual([[0.1, 0.2], [0.3, 0.4]]);
     });
 
-    test("formatStandardizeColumnForChart", () => {
+    test("transformStandardizeColumnForChart", () => {
         const data = {
             "colA": [0.1, -1.3, 1.2],
             "colB": [-0.4, 0.0, 0.4]
         };
-        const result = formatStandardizeColumnForChart(data);
+        const result = transformStandardizeColumnForChart(data);
 
         expect(result.labels).toEqual([0, 1, 2]);
         expect(result.datasets.length).toBe(2);
@@ -108,9 +108,9 @@ describe("ChartJS Helpers", () => {
         expect(result.datasets[1].data).toEqual([-0.4, 0.0, 0.4]);
     });
 
-    test('formatPearsonForChart should return valid chart format for Pearson correlation', () => {
+    test('transformPearsonForChart should return valid chart transform for Pearson correlation', () => {
         const data = { pearson: 0.8 };
-        const result = formatPearsonForChart(data);
+        const result = transformPearsonForChart(data);
     
         expect(result).toEqual({
             labels: ["Pearson Correlation"],
@@ -126,9 +126,9 @@ describe("ChartJS Helpers", () => {
         });
     });
 
-    test('formatSpearmanForChart should return valid chart format for Spearman correlation', () => {
+    test('transformSpearmanForChart should return valid chart transform for Spearman correlation', () => {
         const data = { spearman: 0.9 };
-        const result = formatSpearmanForChart(data);
+        const result = transformSpearmanForChart(data);
     
         expect(result).toEqual({
             labels: ["Spearman Correlation"],
@@ -144,14 +144,14 @@ describe("ChartJS Helpers", () => {
         });
     });
 
-    test('formatCorrelationMatrixForChart should return valid chart format for correlation matrix', () => {
+    test('transformCorrelationMatrixForChart should return valid chart transform for correlation matrix', () => {
         const data = {
             A: { B: 0.5, C: 0.7 },
             B: { A: 0.5, C: 0.8 },
             C: { A: 0.7, B: 0.8 },
         };
     
-        const result = formatCorrelationMatrixForChart(data);
+        const result = transformCorrelationMatrixForChart(data);
     
         expect(result).toEqual({
             labels: ["A", "B", "C"],
@@ -181,7 +181,7 @@ describe("ChartJS Helpers", () => {
         });
     });
 
-    test('transformMeanToChartJS should return valid chart format for mean', () => {
+    test('transformMeanToChartJS should return valid chart transform for mean', () => {
         const result = { mean: 20 };
         const chartJSResult = transformMeanToChartJS(result);
     
@@ -199,7 +199,7 @@ describe("ChartJS Helpers", () => {
         });
     });
 
-    test('transformMedianToChartJS should return valid chart format for median', () => {
+    test('transformMedianToChartJS should return valid chart transform for median', () => {
         const result = { median: 30 };
         const chartJSResult = transformMedianToChartJS(result);
     
@@ -217,7 +217,7 @@ describe("ChartJS Helpers", () => {
         });
     });
 
-    test('transformModeToChartJS should return valid chart format for mode', () => {
+    test('transformModeToChartJS should return valid chart transform for mode', () => {
         const result = { mode: "red" };
         const chartJSResult = transformModeToChartJS(result);
     
@@ -236,9 +236,9 @@ describe("ChartJS Helpers", () => {
     });
 });
 
-describe('Transformation Functions', () => {
+describe('Transtransformion Functions', () => {
     describe('transformStdDevToChartJS', () => {
-        it('should transform standard deviation result to Chart.js format', () => {
+        it('should transform standard deviation result to Chart.js transform', () => {
             const result = { stddev: 5 };
             const datasetLabel = "Standard Deviation";
             const chartData = transformStdDevToChartJS(result, datasetLabel);
@@ -257,7 +257,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformVarianceToChartJS', () => {
-        it('should transform variance result to Chart.js format', () => {
+        it('should transform variance result to Chart.js transform', () => {
             const result = { variance: 100 };
             const datasetLabel = "Variance";
             const chartData = transformVarianceToChartJS(result, datasetLabel);
@@ -276,7 +276,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformMinToChartJS', () => {
-        it('should transform min result to Chart.js format', () => {
+        it('should transform min result to Chart.js transform', () => {
             const result = { min: 70 };
             const datasetLabel = "Min";
             const chartData = transformMinToChartJS(result, datasetLabel);
@@ -295,7 +295,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformMaxToChartJS', () => {
-        it('should transform max result to Chart.js format', () => {
+        it('should transform max result to Chart.js transform', () => {
             const result = { max: 100 };
             const datasetLabel = "Max";
             const chartData = transformMaxToChartJS(result, datasetLabel);
@@ -314,7 +314,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformRangeToChartJS', () => {
-        it('should transform range result to Chart.js format', () => {
+        it('should transform range result to Chart.js transform', () => {
             const result = { range: 40 };
             const datasetLabel = "Range";
             const chartData = transformRangeToChartJS(result, datasetLabel);
@@ -333,7 +333,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformSumToChartJS', () => {
-        it('should transform sum result to Chart.js format', () => {
+        it('should transform sum result to Chart.js transform', () => {
             const result = { sum: 60 };
             const datasetLabel = "Sum";
             const chartData = transformSumToChartJS(result, datasetLabel);
@@ -352,7 +352,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformCountToChartJS', () => {
-        it('should transform count result to Chart.js format', () => {
+        it('should transform count result to Chart.js transform', () => {
             const result = { count: 3 };
             const datasetLabel = "Count";
             const chartData = transformCountToChartJS(result, datasetLabel);
@@ -371,7 +371,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformHistogramToChartJS', () => {
-        it('should transform histogram result to Chart.js format', () => {
+        it('should transform histogram result to Chart.js transform', () => {
             const result = { labels: ["A", "B", "C"], counts: [5, 10, 15] };
             const datasetLabel = "Histogram";
             const chartData = transformHistogramToChartJS(result, datasetLabel);
@@ -391,7 +391,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformKDEToChartJS', () => {
-        it('should transform KDE result to Chart.js format', () => {
+        it('should transform KDE result to Chart.js transform', () => {
             const result = { labels: [1, 2, 3], densities: [0.1, 0.5, 0.3] };
             const datasetLabel = "KDE";
             const chartData = transformKDEToChartJS(result, datasetLabel);
@@ -411,7 +411,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformFilteredSortedDataToChartJS', () => {
-        it('should transform filtered and sorted data to Chart.js format', () => {
+        it('should transform filtered and sorted data to Chart.js transform', () => {
             const result = { data: [{ name: "John", age: 25 }, { name: "Jane", age: 30 }] };
             const headers = ["name", "age"];
             const chartData = transformFilteredSortedDataToChartJS(result, headers);
@@ -430,7 +430,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformZScoreOutliersToChartJS', () => {
-        it('should transform Z-score outlier indices to Chart.js format', () => {
+        it('should transform Z-score outlier indices to Chart.js transform', () => {
             const result = { indices: [0, 2] };
             const data = [10, 20, 30];
             const chartData = transformZScoreOutliersToChartJS(result, data);
@@ -449,7 +449,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformIQROutliersToChartJS', () => {
-        it('should transform IQR outlier indices to Chart.js format', () => {
+        it('should transform IQR outlier indices to Chart.js transform', () => {
             const result = { indices: [1] };
             const data = [10, 20, 30];
             const chartData = transformIQROutliersToChartJS(result, data);
@@ -468,7 +468,7 @@ describe('Transformation Functions', () => {
     });
 
     describe('transformBoxPlotDataToChartJS', () => {
-        it('should transform box plot data to Chart.js format', () => {
+        it('should transform box plot data to Chart.js transform', () => {
             const result = { labels: ["Dataset1"], values: [1, 2, 3, 4, 5] };
             const chartData = transformBoxPlotDataToChartJS(result);
             

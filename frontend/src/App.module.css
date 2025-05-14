@@ -3,6 +3,9 @@
 /* Global app styles */
 .app {
   font-family: Verdana;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Header styles */
@@ -10,11 +13,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px;
-  background-color: #333;
+  padding: 0px;
+  background-color: #f9f9f9;
   color: white;
   position: relative;
-  border-bottom: 2px solid #ddd; /* Line separating header from body */
+  border-bottom: 1px solid #ddd; /* Line separating header from body */
 }
 
 .logoContainer {
@@ -142,3 +145,56 @@
   background-color: #a00;
 }
 
+/* Footer styles */
+.footer {
+  border-top: 1px solid #ddd; /* Divider line above footer */
+  background-color: #f9f9f9;
+  text-align: center;
+  padding: 15px;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Wrapper around sidebar + content */
+.contentWrapper {
+  display: flex;
+  flex-grow: 1;
+}
+
+/* Sidebar styles */
+.sidebar {
+  width: 250px;
+  background-color: #f2f2f2;
+  padding: 20px;
+  border-right: 2px solid #ddd; /* Vertical divider */
+}
+
+.sidebar h3 {
+  margin-top: 0;
+  margin-left: 35px;
+  font-size: 24px;
+  text-decoration: underline;
+}
+
+/* Main content section */
+.mainContent {
+  position: relative;
+  padding: 0px;
+  font-size: 24px;
+}
+
+.mainText {
+  position: relative;
+  top: -2px;
+}
+
+.chartContainer {
+  border: 2px solid #ddd;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  width: 1495px;
+  height: 650px;
+  margin-left: 25px;
+}

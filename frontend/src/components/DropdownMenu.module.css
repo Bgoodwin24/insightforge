@@ -1,0 +1,27 @@
+.dropdownButton {
+    font-size: 20px;
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdownContent {
+  display: flex;
+  flex-direction: column;
+  background-color: transparent;
+  min-width: 160px;
+  padding: 0.5rem;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.itemButton {
+  margin: 2px 0;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+}

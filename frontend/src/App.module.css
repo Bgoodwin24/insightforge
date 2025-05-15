@@ -1,5 +1,3 @@
-/* App.module.css */
-
 /* Global app styles */
 .app {
   font-family: Verdana;
@@ -74,14 +72,12 @@
   background-color: #8c8c8c;
 }
 
-/* Divider line */
 .divider {
   height: 2px;
   background-color: #ddd;
   margin-top: 0px;
 }
 
-/* Main content styles */
 .mainContent {
   text-align: center;
   padding: 20px;
@@ -147,7 +143,7 @@
 
 /* Footer styles */
 .footer {
-  border-top: 1px solid #ddd; /* Divider line above footer */
+  border-top: 1px solid #ddd;
   background-color: #f9f9f9;
   text-align: center;
   padding: 15px;
@@ -159,6 +155,8 @@
 .contentWrapper {
   display: flex;
   flex-grow: 1;
+  height: calc(100vh - 200px);
+  overflow: hidden;
 }
 
 /* Sidebar styles */
@@ -166,7 +164,9 @@
   width: 250px;
   background-color: #f2f2f2;
   padding: 20px;
-  border-right: 2px solid #ddd; /* Vertical divider */
+  border-right: 2px solid #ddd;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
 }
 
 .sidebar h3 {
@@ -176,7 +176,6 @@
   text-decoration: underline;
 }
 
-/* Main content section */
 .mainContent {
   position: relative;
   padding: 0px;

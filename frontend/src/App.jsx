@@ -8,6 +8,7 @@ import * as styles from "./App.module.css";
 import { transformStandardizeColumnForChart, transformBoxPlotDataToChartJS, transformCountToChartJS, transformDroppedRowsToChartJS, transformFilledMissingToChartJS, transformFilteredSortedDataToChartJS, transformGroupedDataToChartJS, transformHistogramToChartJS, transformIQROutliersToChartJS, transformKDEToChartJS, transformLogTransformedToChartJS, transformMaxToChartJS, transformMinToChartJS, transformModeToChartJS, transformNormalizedColumnToChartJS, transformPivotDataToChartJS, transformRangeToChartJS, transformSumToChartJS, transformVarianceToChartJS, transformZScoreOutliersToChartJS } from "./helpers/chartDataTransform";
 import DatasetChart from "./components/charts/DatasetChart";
 import { chartTypeByMethod } from "./components/charts/chartMethodMap";
+import DropdownMenu from "./components/DropdownMenu";
 
 export default function App() {
   const [modalType, setModalType] = useState(null);
@@ -168,6 +169,69 @@ export default function App() {
       <div className={styles.contentWrapper}>
         <aside className={styles.sidebar}>
           <h3>Forge Tools</h3>
+
+          <DropdownMenu
+            label="Aggregation"
+            options={[
+              {
+                text: "Grouped Data",
+                children: [
+                  { text: "Grouped By", onClick: () => handleSelect("aggregation", "grouped-by") },
+                  { text: "Grouped Sum", onClick: () => handleSelect("aggregation", "grouped-sum") },
+                  { text: "Grouped Mean", onClick: () => handleSelect("aggregation", "grouped-mean") },
+                  { text: "Grouped Count", onClick: () => handleSelect("aggregation", "grouped-count") },
+                  { text: "Grouped Min", onClick: () => handleSelect("aggregation", "grouped-min") },
+                  { text: "Grouped Max", onClick: () => handleSelect("aggregation", "grouped-max") },
+                  { text: "Grouped Median", onClick: () => handleSelect("aggregation", "grouped-median") },
+                  { text: "Grouped StdDev", onClick: () => handleSelect("aggregation", "grouped-stddev") }
+                ]
+              },
+              {
+                text: "Pivot Data",
+                children: [
+                  { text: "Pivot Sum", onClick: () => handleSelect("aggregation", "pivot-sum") },
+                  { text: "Pivot Mean", onClick: () => handleSelect("aggregation", "pivot-mean") },
+                  { text: "Pivot Count", onClick: () => handleSelect("aggregation", "pivot-count") },
+                  { text: "Pivot Min", onClick: () => handleSelect("aggregation", "pivot-min") },
+                  { text: "Pivot Max", onClick: () => handleSelect("aggregation", "pivot-max") },
+                  { text: "Pivot Median", onClick: () => handleSelect("aggregation", "pivot-median") },
+                  { text: "Pivot StdDev", onClick: () => handleSelect("aggregation", "pivot-stddev") }
+                ]
+              }
+            ]}
+          />
+
+          <DropdownMenu
+            label="Descriptive Statistics"
+            options={[
+              { text: "Mean", onClick: () => handleSelect("descriptives", "mean") },
+              { text: "Median", onClick: () => handleSelect("descriptives", "median") },
+              { text: "Mode", onClick: () => handleSelect("descriptives", "mode") },
+              { text: "Standard Deviation", onClick: () => handleSelect("descriptives", "stddev") },
+              { text: "Variance", onClick: () => handleSelect("descriptives", "variance") },
+              { text: "Min", onClick: () => handleSelect("descriptives", "min") },
+              { text: "Max", onClick: () => handleSelect("descriptives", "max") },
+              { text: "Sum", onClick: () => handleSelect("descriptives", "sum") },
+              { text: "Range", onClick: () => handleSelect("descriptives", "range") },
+              { text: "Count", onClick: () => handleSelect("descriptives", "count") },
+            ]}
+          />
+
+          <DropdownMenu
+              label=""
+              options={[
+                { text: "", onClick: () => handleSelect("", "") },
+                { text: "", onClick: () => handleSelect("", "") },
+                { text: "", onClick: () => handleSelect("", "") },
+                { text: "", onClick: () => handleSelect("", "") },
+                { text: "", onClick: () => handleSelect("", "") },
+                { text: "", onClick: () => handleSelect("", "") },
+                { text: "", onClick: () => handleSelect("", "") },
+                { text: "", onClick: () => handleSelect("", "") },
+                { text: "", onClick: () => handleSelect("", "") },
+                { text: "", onClick: () => handleSelect("", "") },
+              ]}
+            />
         </aside>
 
         <main className={styles.mainContent}>

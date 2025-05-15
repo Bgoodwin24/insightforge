@@ -1,10 +1,26 @@
 import React from 'react';
-import { Chart as ChartJS, CategoryScale, LinearScale, Tooltip, Title } from 'chart.js';
-import { BoxPlotController, BoxAndWiskers } from 'chartjs-chart-box-and-violin-plot';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  Tooltip,
+  Title,
+} from 'chart.js';
+import {
+  BoxPlotController,
+  BoxAndWiskers,
+} from '@sgratzl/chartjs-chart-boxplot';
 import { Chart } from 'react-chartjs-2';
 import { generateColors, defaultOptions } from './utils/chartUtils';
 
-ChartJS.register(BoxPlotController, BoxAndWiskers, CategoryScale, LinearScale, Tooltip, Title);
+ChartJS.register(
+  BoxPlotController,
+  BoxAndWiskers,
+  CategoryScale,
+  LinearScale,
+  Tooltip,
+  Title
+);
 
 export function BoxPlotChart({ labels, datasets, title }) {
   const colors = generateColors(datasets.length);
@@ -34,5 +50,5 @@ export function BoxPlotChart({ labels, datasets, title }) {
     },
   };
 
-  return <Chart type='boxplot' data={data} options={options} />;
+  return <Chart type="boxplot" data={data} options={options} />;
 }

@@ -11,3 +11,11 @@
 .button:hover {
     background-color: #8c8c8c;
 }
+
+.button:disabled,
+.itemButton:disabled,
+.dropdownButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: none;
+}

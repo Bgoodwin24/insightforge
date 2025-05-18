@@ -115,6 +115,7 @@ func main() {
 		userGroup.POST("/register", userHandler.RegisterUser)
 		userGroup.GET("/verify", userHandler.VerifyEmail)
 		userGroup.POST("/login", userHandler.LoginUser)
+		userGroup.POST("/logout", userHandler.LogoutUser)
 		userGroup.GET("/profile", auth.AuthMiddleware(jwtManager), userHandler.GetMyProfile)
 	}
 
@@ -134,87 +135,80 @@ func main() {
 	}
 
 	// Analytics routes
+	analyticsHandler := &handlers.AnalyticsHandler{
+		Service:        datasetService,
+		DatasetService: datasetService,
+	}
 	analyticsGroup := router.Group("/analytics")
 	analyticsGroup.Use(auth.AuthMiddleware(jwtManager))
 	{
 		// Descriptives
 		descriptivesGroup := analyticsGroup.Group("/descriptives")
 
-		descriptivesGroup.POST("/mean", handlers.MeanHandler)
-		descriptivesGroup.POST("/median", handlers.MedianHandler)
-		descriptivesGroup.POST("/mode", handlers.ModeHandler)
-		descriptivesGroup.POST("/stddev", handlers.StdDevHandler)
-		descriptivesGroup.POST("/variance", handlers.VarianceHandler)
-		descriptivesGroup.POST("/min", handlers.MinHandler)
-		descriptivesGroup.POST("/max", handlers.MaxHandler)
-		descriptivesGroup.POST("/range", handlers.RangeHandler)
-		descriptivesGroup.POST("/sum", handlers.SumHandler)
-		descriptivesGroup.POST("/count", handlers.CountHandler)
+		descriptivesGroup.GET("/mean", analyticsHandler.MeanHandler)
+		descriptivesGroup.GET("/median", analyticsHandler.MedianHandler)
+		descriptivesGroup.GET("/mode", analyticsHandler.ModeHandler)
+		descriptivesGroup.GET("/stddev", analyticsHandler.StdDevHandler)
+		descriptivesGroup.GET("/variance", analyticsHandler.VarianceHandler)
+		descriptivesGroup.GET("/min", analyticsHandler.MinHandler)
+		descriptivesGroup.GET("/max", analyticsHandler.MaxHandler)
+		descriptivesGroup.GET("/range", analyticsHandler.RangeHandler)
+		descriptivesGroup.GET("/sum", analyticsHandler.SumHandler)
+		descriptivesGroup.GET("/count", analyticsHandler.CountHandler)
 
 		// Correlation
 		correlationGroup := analyticsGroup.Group("/correlation")
 
-		correlationGroup.POST("/pearson-correlation", handlers.PearsonHandler)
-		correlationGroup.POST("/spearman-correlation", handlers.SpearmanHandler)
-		correlationGroup.POST("/correlation-matrix", func(c *gin.Context) {
-			handlers.CorrelationMatrixHandler(c, datasetService)
-		})
+		correlationGroup.GET("/pearson-correlation", datasetHandler.PearsonHandler)
+		correlationGroup.GET("/spearman-correlation", datasetHandler.SpearmanHandler)
+		correlationGroup.GET("/correlation-matrix", datasetHandler.CorrelationMatrixHandler)
 
 		// Outliers
 		outliersGroup := analyticsGroup.Group("/outliers")
 
-		outliersGroup.POST("/zscore-outliers", handlers.ZScoreOutliersHandler)
-		outliersGroup.POST("/iqr-outliers", handlers.IQROutliersHandler)
-		outliersGroup.POST("/boxplot", handlers.BoxPlotHandler)
+		outliersGroup.GET("/zscore-outliers", analyticsHandler.ZScoreOutliersHandler)
+		outliersGroup.GET("/iqr-outliers", analyticsHandler.IQROutliersHandler)
+		outliersGroup.GET("/boxplot", analyticsHandler.BoxPlotHandler)
 
 		// Aggregation
 		aggregationGroup := analyticsGroup.Group("/aggregation")
 
-		aggregationGroup.POST("/group-by", handlers.GroupByHandler)
-		aggregationGroup.POST("/grouped-sum", handlers.GroupedSumHandler)
-		aggregationGroup.POST("/grouped-mean", handlers.GroupedMeanHandler)
-		aggregationGroup.POST("/grouped-count", handlers.GroupedCountHandler)
-		aggregationGroup.POST("/grouped-min", handlers.GroupedMinHandler)
-		aggregationGroup.POST("/grouped-max", handlers.GroupedMaxHandler)
-		aggregationGroup.POST("/grouped-median", handlers.GroupedMedianHandler)
-		aggregationGroup.POST("/grouped-stddev", handlers.GroupedStdDevHandler)
-		aggregationGroup.GET("/:datasetID/pivot", handlers.PivotTableHandler)
+		aggregationGroup.GET("/grouped-sum", analyticsHandler.GroupedSumHandler)
+		aggregationGroup.GET("/grouped-mean", analyticsHandler.GroupedMeanHandler)
+		aggregationGroup.GET("/grouped-count", analyticsHandler.GroupedCountHandler)
+		aggregationGroup.GET("/grouped-min", analyticsHandler.GroupedMinHandler)
+		aggregationGroup.GET("/grouped-max", analyticsHandler.GroupedMaxHandler)
+		aggregationGroup.GET("/grouped-median", analyticsHandler.GroupedMedianHandler)
+		aggregationGroup.GET("/grouped-stddev", analyticsHandler.GroupedStdDevHandler)
+		aggregationGroup.GET("/pivot-sum", analyticsHandler.PivotTableHandler)
+		aggregationGroup.GET("/pivot-mean", analyticsHandler.PivotTableHandler)
+		aggregationGroup.GET("/pivot-count", analyticsHandler.PivotTableHandler)
+		aggregationGroup.GET("/pivot-min", analyticsHandler.PivotTableHandler)
+		aggregationGroup.GET("/pivot-max", analyticsHandler.PivotTableHandler)
+		aggregationGroup.GET("/pivot-median", analyticsHandler.PivotTableHandler)
+		aggregationGroup.GET("/pivot-stddev", analyticsHandler.PivotTableHandler)
 
 		// Distribution
 		distributionGroup := analyticsGroup.Group("/distribution")
 
-		distributionGroup.POST("/histogram", handlers.HistogramHandler)
-		distributionGroup.POST("/kde", handlers.KDEHandler)
+		distributionGroup.GET("/histogram", analyticsHandler.HistogramHandler)
+		distributionGroup.GET("/kde", analyticsHandler.KDEHandler)
 
 		// Filter/Sort
 		filtersortGroup := analyticsGroup.Group("/filtersort")
 
-		filtersortGroup.POST("/filter-sort", handlers.FilterSortHandler)
+		filtersortGroup.GET("/filter-sort", datasetHandler.FilterSortHandler)
 
 		// Cleaning
 		cleaningGroup := analyticsGroup.Group("/cleaning")
 
-		cleaningGroup.POST("/drop-rows-with-missing/:datasetID", func(c *gin.Context) {
-			handlers.DropRowsWithMissingHandler(c, datasetService)
-		})
-		cleaningGroup.POST("/fill-missing-with/:datasetID", func(c *gin.Context) {
-			handlers.FillMissingWithHandler(c, datasetService)
-		})
-		cleaningGroup.POST("/apply-log-transformation/:datasetID", func(c *gin.Context) {
-			handlers.ApplyLogTransformationHandler(c, datasetService)
-		})
-		cleaningGroup.POST("/normalize-column/:datasetID", func(c *gin.Context) {
-			handlers.NormalizeColumnHandler(c, datasetService)
-		})
-		cleaningGroup.POST("/standardize-column/:datasetID", func(c *gin.Context) {
-			handlers.StandardizeColumnHandler(c, datasetService)
-		})
-		cleaningGroup.POST("/drop-columns/:datasetID", func(c *gin.Context) {
-			handlers.DropColumnsHandler(c, datasetService)
-		})
-		cleaningGroup.POST("/rename-columns/:datasetID", func(c *gin.Context) {
-			handlers.RenameColumnsHandler(c, datasetService)
-		})
+		cleaningGroup.POST("/drop-rows-with-missing", datasetHandler.DropRowsWithMissingHandler)
+		cleaningGroup.POST("/fill-missing-with", datasetHandler.FillMissingWithHandler)
+		cleaningGroup.POST("/apply-log-transformation", datasetHandler.ApplyLogTransformationHandler)
+		cleaningGroup.POST("/normalize-column", datasetHandler.NormalizeColumnHandler)
+		cleaningGroup.POST("/standardize-column", datasetHandler.StandardizeColumnHandler)
+		cleaningGroup.POST("/drop-columns/:datasetID", datasetHandler.DropColumnsHandler)
+		cleaningGroup.POST("/rename-columns/:datasetID", datasetHandler.RenameColumnsHandler)
 	}
 
 	// Get the port from environment or default to 8080

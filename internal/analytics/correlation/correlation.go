@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
-	"strings"
 )
 
 type CorrelationResult struct {
@@ -59,7 +57,7 @@ func SpearmanCorrelation(x, y []float64) (float64, error) {
 
 // CorrelationMatrix returns an N x N matrix of correlation coefficients for the selected numeric columns.
 // Method should be "pearson" or "spearman".
-func CorrelationMatrix(data [][]string, colIndices []int, method string) ([][]float64, error) {
+func CorrelationMatrix(data [][]float64, colIndices []int, method string) ([][]float64, error) {
 	cols, err := ExtractFloatColumns(data, colIndices)
 	if err != nil {
 		return nil, err
@@ -92,7 +90,7 @@ func CorrelationMatrix(data [][]string, colIndices []int, method string) ([][]fl
 }
 
 // ExtractFloatColumns parses selected columns as float64 slices from a 2D string dataset.
-func ExtractFloatColumns(data [][]string, colIndices []int) ([][]float64, error) {
+func ExtractFloatColumns(data [][]float64, colIndices []int) ([][]float64, error) {
 	result := make([][]float64, len(colIndices))
 	for i := range result {
 		result[i] = make([]float64, 0, len(data))
@@ -102,14 +100,7 @@ func ExtractFloatColumns(data [][]string, colIndices []int) ([][]float64, error)
 			if colIdx >= len(row) {
 				return nil, fmt.Errorf("column index %d out of range", colIdx)
 			}
-			cleaned := strings.TrimSpace(row[colIdx])
-			if cleaned == "" {
-				return nil, fmt.Errorf("empty value at row: %v", row)
-			}
-			val, err := strconv.ParseFloat(cleaned, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid float at row: %v", err)
-			}
+			val := row[colIdx]
 			result[j] = append(result[j], val)
 		}
 	}

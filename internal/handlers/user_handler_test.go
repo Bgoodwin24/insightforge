@@ -18,6 +18,7 @@ import (
 	"github.com/Bgoodwin24/insightforge/internal/testutils"
 	"github.com/Bgoodwin24/insightforge/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/lib/pq"
@@ -144,4 +145,57 @@ func TestVerifyEmail_Success(t *testing.T) {
 		t.Fatal("Failed to count pending users:", err)
 	}
 	assert.Equal(t, 0, count)
+}
+
+func TestLoginUser_Success(t *testing.T) {
+	testRepo := database.NewRepository(testDB)
+	testutils.CleanDB(testRepo)
+
+	logger.Init()
+	userService := services.NewUserService(testRepo)
+	userHandler := handlers.NewUserHandler(userService, nil, auth.NewJWTManager("test-secret", time.Hour))
+
+	router := gin.Default()
+	router.POST("/login", userHandler.LoginUser)
+
+	// Insert active user directly into users table with hashed password
+	hashedPassword, err := auth.HashPassword("Password123!")
+	if err != nil {
+		t.Fatal(err)
+	}
+	userID := uuid.New() // Or however you generate UUIDs in tests
+	_, err = testRepo.DB.Exec(`
+	INSERT INTO users (id, email, username, password_hash, created_at, updated_at)
+	VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+		userID, "testuser@example.com", "testuser", hashedPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loginBody := `{"email":"testuser@example.com","password":"Password123!"}`
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(loginBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"message":"Login Successful"`)
+	assert.Contains(t, w.Body.String(), `"username":"testuser"`)
+	assert.Contains(t, w.Body.String(), `"email":"testuser@example.com"`)
+
+	// Check that cookie is set with the token
+	cookies := w.Result().Cookies()
+	var tokenCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "token" {
+			tokenCookie = c
+			break
+		}
+	}
+	assert.NotNil(t, tokenCookie, "token cookie should be set")
+	assert.True(t, tokenCookie.HttpOnly, "token cookie should be HttpOnly")
+	assert.Equal(t, "/", tokenCookie.Path)
+	assert.Equal(t, "localhost", tokenCookie.Domain)
+	assert.NotEmpty(t, tokenCookie.Value, "token cookie value should not be empty")
 }

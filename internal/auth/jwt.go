@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -77,27 +76,23 @@ func (j *JWTManager) Verify(accessToken string) (*Claims, error) {
 
 func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
+		token, err := c.Cookie("token")
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authentication token missing"})
 			return
 		}
 
-		fields := strings.Fields(authHeader)
-		if len(fields) != 2 || fields[0] != "Bearer" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
-			return
-		}
-
-		claims, err := jwtManager.Verify(fields[1])
+		// Verify the token string
+		claims, err := jwtManager.Verify(token)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 			return
 		}
 
-		// Store claims in context
+		// Store claims info in context for handlers to use
 		c.Set("user_id", claims.UserID.String())
 		c.Set("userEmail", claims.Email)
+
 		c.Next()
 	}
 }

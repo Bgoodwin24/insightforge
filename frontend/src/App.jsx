@@ -1,11 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Button from "./components/Button";
 import Modal from "./components/Modal";
 import AuthForm from "./components/AuthForm";
 import UploadForm from "./components/UploadForm";
 import AccountMenu from "./components/AccountMenu";
 import * as styles from "./App.module.css";
-import { transformStandardizeColumnForChart, transformBoxPlotDataToChartJS, transformCountToChartJS, transformDroppedRowsToChartJS, transformFilledMissingToChartJS, transformFilteredSortedDataToChartJS, transformGroupedDataToChartJS, transformHistogramToChartJS, transformIQROutliersToChartJS, transformKDEToChartJS, transformLogTransformedToChartJS, transformMaxToChartJS, transformMinToChartJS, transformModeToChartJS, transformNormalizedColumnToChartJS, transformPivotDataToChartJS, transformRangeToChartJS, transformSumToChartJS, transformVarianceToChartJS, transformZScoreOutliersToChartJS } from "./helpers/chartDataTransform";
+import {
+  transformGroupedDataToChartJS,
+  transformPivotDataToChartJS,
+  transformDroppedRowsToChartJS,
+  transformFilledMissingToChartJS,
+  transformLogTransformedToChartJS,
+  transformNormalizedColumnToChartJS,
+  transformStandardizeColumnForChart,
+  transformPearsonForChart,
+  transformSpearmanForChart,
+  transformCorrelationMatrixForChart,
+  transformMeanToChartJS,
+  transformMedianToChartJS,
+  transformModeToChartJS,
+  transformStdDevToChartJS,
+  transformVarianceToChartJS,
+  transformMinToChartJS,
+  transformMaxToChartJS,
+  transformRangeToChartJS,
+  transformSumToChartJS,
+  transformCountToChartJS,
+  transformHistogramToChartJS,
+  transformKDEToChartJS,
+  transformFilteredSortedDataToChartJS,
+  transformZScoreOutliersToChartJS,
+  transformIQROutliersToChartJS,
+  transformBoxPlotDataToChartJS,
+} from "./helpers/chartDataTransform";
 import DatasetChart from "./components/charts/DatasetChart";
 import { chartTypeByMethod } from "./components/charts/chartMethodMap";
 import DropdownMenu from "./components/DropdownMenu";
@@ -17,17 +44,46 @@ export default function App() {
   const [labels, setLabels] = useState([]);
   const [datasets, setDatasets] = useState([]);
   const [title, setTitle] = useState("");
+  const [datasetId, setDatasetId] = useState(null);
 
 
   const closeModal = () => setModalType(null);
 
+    useEffect(() => {
+      // On mount, try fetching the logged-in user profile
+      const fetchUserProfile = async () => {
+        try {
+          const res = await fetch("/user/profile", {
+            credentials: "include", // to send cookies
+          });
+          if (res.ok) {
+            const userData = await res.json();
+            setUser(userData.user);
+          } else {
+            // not logged in or no session, do nothing or setUser(null)
+            setUser(null);
+          }
+        } catch (error) {
+          console.error("Failed to fetch user profile:", error);
+          setUser(null);
+        }
+      };
+
+      fetchUserProfile();
+    }, []);
+
   const handleLogout = async () => {
-    await fetch("http://localhost:8080/user/logout", {
-      method: "POST",
-      credentials: "include",
-    });
-    setUser(null);
+    try {
+      await fetch("/user/logout", {
+        method: "POST",
+        credentials: "include", // important to send cookies
+      });
+      setUser(null);
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
   };
+
 
   const handleSelect = async (group, method) => {
     const url = `http://localhost:3000/analytics/${group}/${method}?dataset_id=${datasetId}`;
@@ -71,53 +127,66 @@ export default function App() {
         case 'histogram':
           transformed = transformHistogramToChartJS(raw);
           break;
-        case 'KDE':
+        case 'kde':
           transformed = transformKDEToChartJS(raw);
           break;
-        case 'filterSort':
+        case 'filtersort':
           transformed = transformFilteredSortedDataToChartJS(raw);
           break;
-        case 'ZScore':
+        case 'zscore-outliers':
           transformed = transformZScoreOutliersToChartJS(raw);
           break;
-        case 'IQR':
+        case 'iqr-outliers':
           transformed = transformIQROutliersToChartJS(raw);
           break;
-        case 'boxPlot':
+        case 'boxplot':
           transformed = transformBoxPlotDataToChartJS(raw);
           break;
-        case 'groupedData':
+        case 'grouped-sum':
+        case 'grouped-mean':
+        case 'grouped-count':
+        case 'grouped-min':
+        case 'grouped-max':
+        case 'grouped-median':
+        case 'grouped-stddev':
           transformed = transformGroupedDataToChartJS(raw);
           break;
-        case 'pivotData':
+        case 'pivot-sum':
+        case 'pivot-mean':
+        case 'pivot-count':
+        case 'pivot-min':
+        case 'pivot-max':
+        case 'pivot-median':
+        case 'pivot-stddev':
           transformed = transformPivotDataToChartJS(raw);
           break;
-        case 'droppedRow':
+        case 'drop-rows-with-missing':
           transformed = transformDroppedRowsToChartJS(raw);
           break;
-        case 'fillMissingWith':
+        case 'fill-missing-with':
           transformed = transformFilledMissingToChartJS(raw);
           break;
-        case 'logTransform':
+        case 'apply-log-transformation':
           transformed = transformLogTransformedToChartJS(raw);
           break;
-        case 'normalizeColumn':
+        case 'normalize-column':
           transformed = transformNormalizedColumnToChartJS(raw);
           break;
-        case 'standardizeColumn':
+        case 'standardize-column':
           transformed = transformStandardizeColumnForChart(raw);
           break;
-        case 'correlation-pearson':
+        case 'pearson-correlation':
           transformed = transformPearsonForChartJS(raw);
           break;
-        case 'correlation-spearman':
+        case 'spearman-correlation':
           transformed = transformSpearmanForChartJS(raw);
           break;
-        case 'correlationMatrix':
+        case 'correlation-matrix':
           transformed = transformCorrelationMatrixForChart(raw);
           break;
         default:
-          throw new Error(`No transform defined for method: ${method}`);
+          console.error(`No transform defined for method: ${method}`);
+          throw new Error(`Unsupported analysis method: ${method}`);
       }
 
       // Update chart state
@@ -149,7 +218,7 @@ export default function App() {
 
         <div className={styles.buttonContainer}>
           {!user ? (
-            <Button text="Login / Register" onClick={() => setModalType("auth")} />
+            <Button text="Login / Register" onClick={() => setModalType("auth") } />
           ) : (
             <div className={styles.accountMenu}>
               <AccountMenu
@@ -159,7 +228,12 @@ export default function App() {
               />
             </div>
           )}
-          <Button text="Upload Dataset" onClick={() => setModalType("upload")} />
+          <Button
+            text="Upload Dataset"
+            onClick={() => setModalType("upload")}
+            disabled={!user}
+            title={!user ? "Login to upload a dataset" : ""}
+          />
         </div>
       </header>
 
@@ -172,6 +246,7 @@ export default function App() {
 
           <DropdownMenu
             label="Aggregation"
+            disabled={datasetId === null}
             options={[
               {
                 text: "Grouped Data",
@@ -202,7 +277,30 @@ export default function App() {
           />
 
           <DropdownMenu
+              label="Cleaning"
+              disabled={datasetId === null}
+              options={[
+                { text: "Dropped Rows", onClick: () => handleSelect("cleaning", "drop-rows-with-missing") },
+                { text: "Fill Missing With", onClick: () => handleSelect("cleaning", "fill-missing-with") },
+                { text: "Log Transform", onClick: () => handleSelect("cleaning", "apply-log-transformation") },
+                { text: "Normalize Column", onClick: () => handleSelect("cleaning", "normalize-column") },
+                { text: "Standardize Column", onClick: () => handleSelect("cleaning", "standardize-column") },
+              ]}
+            />
+
+          <DropdownMenu
+            label="Correlation"
+            disabled={datasetId === null}
+            options={[
+              { text: "Pearson", onClick: () => handleSelect("correlation", "pearson-correlation") },
+              { text: "Spearman", onClick: () => handleSelect("correlation", "spearman-correlation") },
+              { text: "Correlation Matrix", onClick: () => handleSelect("correlation", "correlation-matrix") },
+            ]}
+          />
+
+          <DropdownMenu
             label="Descriptive Statistics"
+            disabled={datasetId === null}
             options={[
               { text: "Mean", onClick: () => handleSelect("descriptives", "mean") },
               { text: "Median", onClick: () => handleSelect("descriptives", "median") },
@@ -218,32 +316,47 @@ export default function App() {
           />
 
           <DropdownMenu
-              label=""
-              options={[
-                { text: "", onClick: () => handleSelect("", "") },
-                { text: "", onClick: () => handleSelect("", "") },
-                { text: "", onClick: () => handleSelect("", "") },
-                { text: "", onClick: () => handleSelect("", "") },
-                { text: "", onClick: () => handleSelect("", "") },
-                { text: "", onClick: () => handleSelect("", "") },
-                { text: "", onClick: () => handleSelect("", "") },
-                { text: "", onClick: () => handleSelect("", "") },
-                { text: "", onClick: () => handleSelect("", "") },
-                { text: "", onClick: () => handleSelect("", "") },
-              ]}
-            />
+            label="Distribution"
+            disabled={datasetId === null}
+            options={[
+              { text: "Histogram", onClick: () => handleSelect("distribution", "histogram") },
+              { text: "KDE", onClick: () => handleSelect("distribution", "kde") },
+            ]}
+          />
+
+          <DropdownMenu
+            label="Filter Sort"
+            disabled={datasetId === null}
+            options={[
+              { text: "Filter Sort", onClick: () => handleSelect("filtersort", "filter-sort") },
+            ]}
+          />
+
+          <DropdownMenu
+            label="Outliers"
+            disabled={datasetId === null}
+            options={[
+              { text: "Z Score", onClick: () => handleSelect("outliers", "zscore-outliers") },
+              { text: "IQR", onClick: () => handleSelect("outliers", "iqr-outliers") },
+              { text: "Box Plot", onClick: () => handleSelect("outliers", "boxplot") },
+            ]}
+          />
         </aside>
 
         <main className={styles.mainContent}>
           <div className={styles.mainText}>Explore your datasets here.</div>
 
            <div className={styles.chartContainer}>
-              <DatasetChart
-                chartType={chartTypeByMethod[method]}
-                labels={labels}
-                datasets={datasets}
-                title={title}
-              />
+              {datasets.length > 0 && method ? (
+                <DatasetChart
+                  chartType={chartTypeByMethod[method]}
+                  labels={labels}
+                  datasets={datasets}
+                  title={title}
+                />
+              ) : (
+                <p className="text-muted">Upload a dataset and select a method to visualize it.</p>
+              )}
             </div>
 
           {modalType === "auth" && (

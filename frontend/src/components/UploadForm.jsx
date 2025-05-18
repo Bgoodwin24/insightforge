@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import Button from "./Button";
 
-export default function UploadForm({ onSuccess }) {
+export default function UploadForm({ onSuccess, user }) {
   const [file, setFile] = useState(null);
-  const [isUploading, setIsUploading] = useState(false); // Track upload state
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleUpload = async () => {
-    if (isUploading || !file) return; // Prevent multiple uploads
+    if (isUploading || !file || !user) return;
     setIsUploading(true);
 
     const formData = new FormData();
@@ -18,29 +18,40 @@ export default function UploadForm({ onSuccess }) {
       body: formData,
     });
 
-    setIsUploading(false); // Re-enable button after upload
+    setIsUploading(false);
 
     if (res.ok) {
       onSuccess();
-      setFile(null); // Reset file input after successful upload
+      setFile(null);
     } else {
       const err = await res.json().catch(() => ({}));
       alert(err.error || "Upload failed");
     }
   };
 
+  const isDisabled = isUploading || !file || !user;
+  const tooltip = !user ? "Login to upload a dataset" : "";
+
   return (
     <>
-      <input
-        aria-label="Dataset Upload"
-        type="file"
-        onChange={(e) => setFile(e.target.files[0])}
-      />
+      {/* Custom-styled file input */}
+      <label>
+        <input
+          type="file"
+          accept=".csv"
+          onChange={(e) => setFile(e.target.files[0])}
+          style={{ display: "none" }}
+        />
+        <Button text={file ? `File: ${file.name}` : "Choose File"} />
+      </label>
+
       <br />
+
       <Button
         text="Upload Dataset"
         onClick={handleUpload}
-        disabled={isUploading || !file} // Disable button when uploading or no file selected
+        disabled={isDisabled}
+        title={isDisabled ? tooltip : ""}
       />
     </>
   );

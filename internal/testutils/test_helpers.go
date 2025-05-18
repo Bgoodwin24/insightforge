@@ -167,3 +167,23 @@ func InsertTestValueWithRecordID(t *testing.T, repo *database.Repository, datase
 	`, recordID, fieldID, value)
 	require.NoError(t, err)
 }
+
+func InsertTestRecordMulti(t *testing.T, repo *database.Repository, datasetID uuid.UUID, values map[uuid.UUID]string) {
+	t.Helper()
+	recordID := uuid.New()
+	now := time.Now()
+
+	_, err := repo.DB.Exec(`
+        INSERT INTO dataset_records (id, dataset_id, created_at, updated_at)
+        VALUES ($1, $2, $3, $4)
+    `, recordID, datasetID, now, now)
+	require.NoError(t, err)
+
+	for fieldID, value := range values {
+		_, err := repo.DB.Exec(`
+            INSERT INTO record_values (record_id, field_id, value)
+            VALUES ($1, $2, $3)
+        `, recordID, fieldID, value)
+		require.NoError(t, err)
+	}
+}

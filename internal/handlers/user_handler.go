@@ -131,8 +131,8 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 	pendingUser, err := h.UserService.RegisterPendingUser(request.Username, request.Email, request.Password)
 	if err != nil {
 		// Log security event
-		logger.Logger.Printf("SECURITY: Failed registration attempt from IP: %s, Email: %s, Error: %s",
-			ip, request.Email, err.Error())
+		logger.Logger.Printf("SECURITY: Failed registration attempt from IP: %s, Error: %s",
+			ip, err.Error())
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -202,8 +202,14 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
+	_, err := h.JWTManager.Verify(token)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Verification link is invalid or has expired"})
+		return
+	}
+
 	// Check if token exists and is valid
-	user, err := h.UserService.Repo.Queries.GetPendingUserByToken(context.Background(), token)
+	user, err := h.UserService.Repo.Queries.GetPendingUserByToken(c.Request.Context(), token)
 	if err != nil {
 		c.JSON(400, gin.H{"error": "Verification link is invalid or has expired"})
 		return
@@ -252,6 +258,17 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 		return
 	}
 
+	// Set JWT token as an HTTP-only cookie, expires in 1 hour
+	c.SetCookie(
+		"token",
+		token,
+		3600,        // maxAge in seconds (1 hour)
+		"/",         // cookie path
+		"localhost", // domain
+		false,       // secure (false for localhost HTTP)
+		true,        // httpOnly
+	)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login Successful",
 		"user": gin.H{
@@ -259,8 +276,22 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 			"username": user.Username,
 			"email":    user.Email,
 		},
-		"token": token,
 	})
+}
+
+func (h *UserHandler) LogoutUser(c *gin.Context) {
+	// Clear the cookie by setting MaxAge < 0 or expires in past
+	c.SetCookie(
+		"token",
+		"",
+		-1, // maxAge negative expires the cookie immediately
+		"/",
+		"localhost", // or your domain
+		false,       // secure (true if HTTPS)
+		true,        // httpOnly
+	)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
 func (h *UserHandler) GetMyProfile(c *gin.Context) {

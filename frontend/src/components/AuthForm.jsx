@@ -43,6 +43,11 @@ export default function AuthForm({ mode = "login", onSuccess }) {
     }
   };
 
+  const isFormValid =
+  email.trim() !== "" &&
+  password.trim() !== "" &&
+  (formMode === "login" || username.trim() !== "");
+
   return (
     <>
       {formMode === "register" && (
@@ -71,7 +76,7 @@ export default function AuthForm({ mode = "login", onSuccess }) {
         onChange={(e) => setPassword(e.target.value)}
       />
       <br />
-      <Button text={formMode === "login" ? "Login" : "Register"} onClick={handleSubmit} disabled={isSubmitting} />
+      <Button text={formMode === "login" ? "Login" : "Register"} onClick={handleSubmit} disabled={isSubmitting || !isFormValid} />
       <p onClick={toggleMode} style={{ cursor: "pointer", marginTop: "10px" }}>
         {formMode === "login"
           ? "Need an account? Register"

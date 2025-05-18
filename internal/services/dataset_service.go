@@ -46,28 +46,15 @@ func (s *DatasetService) DeleteFieldFromDataset(c *gin.Context, datasetID uuid.U
 	return err
 }
 
-func (s *DatasetService) GetDatasetHeaders(ctx context.Context, datasetID uuid.UUID) ([]string, error) {
-	rows, err := s.GetDatasetRows(ctx, datasetID)
+func (s *DatasetService) GetDatasetHeaders(ctx context.Context, datasetID, userID uuid.UUID) ([]string, error) {
+	header, _, err := s.GetDatasetRows(ctx, datasetID, userID)
 	if err != nil {
 		return nil, err
 	}
-	if len(rows) == 0 {
+	if len(header) == 0 {
 		return nil, fmt.Errorf("dataset is empty")
 	}
-
-	// Get the fields for the dataset (we expect these to be the header names)
-	fields, err := s.Repo.Queries.GetFieldsByDatasetID(ctx, datasetID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get fields: %w", err)
-	}
-
-	// Ensure that we return the field names in the correct order
-	headers := make([]string, len(fields))
-	for i, field := range fields {
-		headers[i] = field.Name
-	}
-
-	return headers, nil
+	return header, nil
 }
 
 func (s *DatasetService) GetDatasetByID(ctx context.Context, id uuid.UUID) (database.Dataset, error) {
@@ -78,50 +65,51 @@ func (s *DatasetService) GetDatasetByID(ctx context.Context, id uuid.UUID) (data
 	return dataset, nil
 }
 
-func (s *DatasetService) GetDatasetRows(ctx context.Context, datasetID uuid.UUID) ([][]string, error) {
+func (s *DatasetService) GetDatasetRows(ctx context.Context, datasetID, userID uuid.UUID) ([]string, [][]string, error) {
 	// 1. Load fields (columns)
 	fields, err := s.Repo.Queries.GetFieldsByDatasetID(ctx, datasetID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get fields: %w", err)
+		return nil, nil, fmt.Errorf("failed to get fields: %w", err)
 	}
 
 	// 2. Load records (rows)
 	records, err := s.Repo.Queries.GetRecordsByDatasetID(ctx, datasetID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get records: %w", err)
+		return nil, nil, fmt.Errorf("failed to get records: %w", err)
 	}
 
 	if len(fields) == 0 || len(records) == 0 {
-		return [][]string{}, nil // empty dataset
+		return []string{}, [][]string{}, nil // empty dataset
 	}
 
-	// 3. Build a map of fieldID to column index
-	fieldOrder := make(map[uuid.UUID]int)
+	// 3. Build field index map and header
+	fieldIndexMap := make(map[uuid.UUID]int)
+	header := make([]string, len(fields))
 	for idx, field := range fields {
-		fieldOrder[field.ID] = idx
+		fieldIndexMap[field.ID] = idx
+		header[idx] = field.Name
 	}
 
-	// 4. Now fetch all record_values for the dataset
+	// 4. Fetch all record_values
 	values, err := s.Repo.Queries.GetRecordValuesByDatasetID(ctx, datasetID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get record values: %w", err)
+		return nil, nil, fmt.Errorf("failed to get record values: %w", err)
 	}
 
 	// 5. Organize values by record
 	recordValueMap := make(map[uuid.UUID]map[int]string)
-
 	for _, val := range values {
+		colIdx, ok := fieldIndexMap[val.FieldID]
+		if !ok {
+			continue
+		}
 		if _, ok := recordValueMap[val.RecordID]; !ok {
 			recordValueMap[val.RecordID] = make(map[int]string)
-		}
-		colIdx, ok := fieldOrder[val.FieldID]
-		if !ok {
-			continue // field missing
 		}
 		recordValueMap[val.RecordID][colIdx] = val.Value.String
 	}
 
-	// 6. Now reconstruct the [][]string
+	// 6. Reconstruct rows
 	var rows [][]string
 	for _, record := range records {
 		row := make([]string, len(fields))
@@ -135,7 +123,7 @@ func (s *DatasetService) GetDatasetRows(ctx context.Context, datasetID uuid.UUID
 		rows = append(rows, row)
 	}
 
-	return rows, nil
+	return header, rows, nil
 }
 
 func (s *DatasetService) CreateDataset(ctx context.Context, userID uuid.UUID, name, description string) (database.Dataset, error) {
@@ -351,4 +339,45 @@ func isDate(val string) bool {
 		}
 	}
 	return false
+}
+
+func (s *DatasetService) GetNumericColumnValues(ctx context.Context, datasetID, userID uuid.UUID, column string) ([]float64, error) {
+	headers, rows, err := s.GetDatasetRows(ctx, datasetID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dataset rows: %w", err)
+	}
+
+	// Find the index of the requested column
+	colIdx := -1
+	for i, h := range headers {
+		if h == column {
+			colIdx = i
+			break
+		}
+	}
+	if colIdx == -1 {
+		return nil, fmt.Errorf("column '%s' not found in dataset", column)
+	}
+
+	var values []float64
+	for i, row := range rows {
+		if colIdx >= len(row) {
+			continue // skip malformed rows
+		}
+		raw := row[colIdx]
+		if raw == "" {
+			continue
+		}
+		parsed, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return nil, fmt.Errorf("row %d: cannot parse '%s' as float64", i, raw)
+		}
+		values = append(values, parsed)
+	}
+
+	if len(values) == 0 {
+		return nil, fmt.Errorf("no valid numeric values found in column '%s'", column)
+	}
+
+	return values, nil
 }

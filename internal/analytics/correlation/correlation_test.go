@@ -32,10 +32,10 @@ func TestSpearmanCorrelation(t *testing.T) {
 }
 
 func TestCorrelationMatrix(t *testing.T) {
-	data := [][]string{
-		{"1", "2", "3"},
-		{"2", "4", "6"},
-		{"3", "6", "9"},
+	data := [][]float64{
+		{1, 2, 3},
+		{2, 4, 6},
+		{3, 6, 9},
 	}
 	cols := []int{0, 1, 2}
 	matrix, err := correlation.CorrelationMatrix(data, cols, "pearson")
@@ -51,9 +51,9 @@ func TestCorrelationMatrix(t *testing.T) {
 }
 
 func TestExtractFloatColumns(t *testing.T) {
-	data := [][]string{
-		{"1", "2"},
-		{"3", "4"},
+	data := [][]float64{
+		{1, 2},
+		{3, 4},
 	}
 	cols, err := correlation.ExtractFloatColumns(data, []int{0, 1})
 	if err != nil {

@@ -61,7 +61,8 @@ func (q *Queries) DeletePendingUserByID(ctx context.Context, id uuid.UUID) error
 }
 
 const getPendingUserByToken = `-- name: GetPendingUserByToken :one
-SELECT id, email, username, password_hash, token, created_at, expires_at FROM pending_users WHERE token = $1
+SELECT id, email, username, password_hash, token, created_at, expires_at FROM pending_users 
+WHERE token = $1 AND created_at > NOW() - INTERVAL '1 hour'
 `
 
 func (q *Queries) GetPendingUserByToken(ctx context.Context, token string) (PendingUser, error) {

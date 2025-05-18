@@ -6,7 +6,7 @@
 
 .dropdown {
   position: relative;
-  display: inline-block;
+  display: block;
 }
 
 .dropdownContent {
@@ -17,11 +17,27 @@
   padding: 0.5rem;
   box-shadow: none;
   border-radius: 0;
+  gap: 4px;
 }
 
 .itemButton {
+  display: block;
   margin: 2px 0;
   width: 100%;
   text-align: left;
   font-size: 14px;
+}
+
+/* Greys out disabled dropdown button */
+.dropdownButton:disabled,
+.itemButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+/* Optional hover rule to prevent styling on hover */
+.dropdownButton:disabled:hover,
+.itemButton:disabled:hover {
+  background-color: transparent;
 }

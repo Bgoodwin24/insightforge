@@ -40,6 +40,11 @@ graph TD
 - Node.js (v21.7.0 or later)
 - NPM (v10.5.0 or later)
 - Chart.js (for data visualization) (v4.4.8 or later)
+- Chartjs Chart Boxplot (v4.4.4 or later)
+- Chartjs Chart Matrix (v3.0.0 or later)
+- React (v18.3.1 or later)
+- React Dom (v18.3.1 or later)
+- React Chartjs 2 (v5.3.0 or later)
 
 ## Development Tools
 - Air (live reloading) (v1.61.7 or later)
@@ -125,13 +130,17 @@ go install github.com/pressly/goose/v3/cmd/goose@latest
 sudo apt update
 sudo apt install nodejs npm
 ```
+- React
+``` bash
+npm install react react-dom
+```
 - Air
 ``` bash
 go install github.com/air-verse/air@latest
 ```
 - Chart.js
 ``` bash
-npm install chart.js
+npm install chart.js @sgratzl/chartjs-chart-boxplot chartjs-chart-matrix react-chartjs-2
 ```
 - Jest
 ``` bash
@@ -349,7 +358,8 @@ Frequency distributions and kernel density estimates.
 Histogram Example:
 
 ```http
-GET /analytics/distribution/histogram?dataset_id=your_uuid&column=SpendingScore```
+GET /analytics/distribution/histogram?dataset_id=your_uuid&column=SpendingScore
+```
 
 Example Response:
 
@@ -359,7 +369,8 @@ Example Response:
 
 KDE Example:
 ```http
-GET /analytics/distribution/kde?dataset_id=your_uuid&column=SpendingScore```
+GET /analytics/distribution/kde?dataset_id=your_uuid&column=SpendingScore
+```
 
 Example Response:
 
@@ -458,6 +469,8 @@ The following features are partially implemented and will have their user interf
 Apply Log Transform, Drop Rows With Missing, Fill Missing With, Filter/Sort, Group Dataset By, Normalize Column, and Standardize Column.
 
 Note: Although "Group Dataset By" is not fully exposed in the UI, functionality that depends on it (e.g., Grouped Data Analytics) will continue to work by calling the relevant API endpoints directly.
+
+For other security related updates intended for if this were to ever be launched for production see SECURITY.md.
 
 ## License
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

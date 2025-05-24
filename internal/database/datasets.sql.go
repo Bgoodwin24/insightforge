@@ -231,6 +231,33 @@ func (q *Queries) GetDatasetFields(ctx context.Context, datasetID uuid.UUID) ([]
 	return items, nil
 }
 
+const getDatasetFieldsForDataset = `-- name: GetDatasetFieldsForDataset :many
+SELECT name FROM dataset_fields WHERE dataset_id = $1 ORDER BY created_at
+`
+
+func (q *Queries) GetDatasetFieldsForDataset(ctx context.Context, datasetID uuid.UUID) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getDatasetFieldsForDataset, datasetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDatasetRecords = `-- name: GetDatasetRecords :many
 SELECT id, dataset_id, created_at, updated_at FROM dataset_records
 WHERE dataset_id = $1

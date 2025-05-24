@@ -8,12 +8,36 @@ import (
 
 // Missing Value Handling
 // Drops any rows that contain empty string cells
-func DropRowsWithMissing(data [][]string) [][]string {
-	var cleaned [][]string
-	for _, row := range data {
+func DropRowsWithMissing(data [][]string, columns []string) [][]string {
+	if len(data) == 0 {
+		return data
+	}
+
+	// Map column names to their index
+	header := data[0]
+	colIndexes := make([]int, 0, len(columns))
+	for _, col := range columns {
+		found := false
+		for i, name := range header {
+			if name == col {
+				colIndexes = append(colIndexes, i)
+				found = true
+				break
+			}
+		}
+		if !found {
+			// If a column isn't found in header, skip or return empty
+			return [][]string{header} // return only header if column doesn't exist
+		}
+	}
+
+	// Build result, always keep header
+	cleaned := [][]string{header}
+
+	for _, row := range data[1:] {
 		missing := false
-		for _, cell := range row {
-			if cell == "" {
+		for _, idx := range colIndexes {
+			if row[idx] == "" {
 				missing = true
 				break
 			}
@@ -22,6 +46,7 @@ func DropRowsWithMissing(data [][]string) [][]string {
 			cleaned = append(cleaned, row)
 		}
 	}
+
 	return cleaned
 }
 
@@ -80,7 +105,7 @@ func ApplyLogTransformation(data [][]string, col int) ([][]string, error) {
 }
 
 // Applies min-max normalization to a column
-func NormalizeColumn(data [][]string, col int) ([][]string, error) {
+func NormalizeColumn(data [][]string, col int) ([]float64, error) {
 	values := make([]float64, len(data))
 
 	for i, row := range data {
@@ -104,19 +129,17 @@ func NormalizeColumn(data [][]string, col int) ([][]string, error) {
 		}
 	}
 
-	normalized := make([][]string, len(data))
-	for i := range data {
-		normalized[i] = make([]string, len(data[i]))
-		copy(normalized[i], data[i])
+	result := make([]float64, len(values))
+	for i, v := range values {
 		if max == min {
-			normalized[i][col] = "0" // Avoid divide by zero
+			result[i] = 0
 		} else {
-			norm := (values[i] - min) / (max - min)
-			normalized[i][col] = fmt.Sprintf("%f", norm)
+			norm := (v - min) / (max - min)
+			result[i] = math.Round(norm*1e6) / 1e6
 		}
 	}
 
-	return normalized, nil
+	return result, nil
 }
 
 // Applies z-score standardization to a column

@@ -82,42 +82,53 @@ func (s *DatasetService) GetDatasetRows(ctx context.Context, datasetID, userID u
 		return []string{}, [][]string{}, nil // empty dataset
 	}
 
-	// 3. Build field index map and header
+	// 3. Build header and field index map
 	fieldIndexMap := make(map[uuid.UUID]int)
 	header := make([]string, len(fields))
-	for idx, field := range fields {
-		fieldIndexMap[field.ID] = idx
-		header[idx] = field.Name
+	for i, f := range fields {
+		fieldIndexMap[f.ID] = i
+		header[i] = f.Name
 	}
 
-	// 4. Fetch all record_values
+	// 4. Load all record values
 	values, err := s.Repo.Queries.GetRecordValuesByDatasetID(ctx, datasetID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get record values: %w", err)
 	}
 
-	// 5. Organize values by record
-	recordValueMap := make(map[uuid.UUID]map[int]string)
+	// 5. Build value map per record with nil handling
+	recordValueMap := make(map[uuid.UUID]map[int]*string)
 	for _, val := range values {
 		colIdx, ok := fieldIndexMap[val.FieldID]
 		if !ok {
 			continue
 		}
-		if _, ok := recordValueMap[val.RecordID]; !ok {
-			recordValueMap[val.RecordID] = make(map[int]string)
+		if _, exists := recordValueMap[val.RecordID]; !exists {
+			recordValueMap[val.RecordID] = make(map[int]*string)
 		}
-		recordValueMap[val.RecordID][colIdx] = val.Value.String
+		if val.Value.Valid {
+			v := val.Value.String
+			recordValueMap[val.RecordID][colIdx] = &v
+		} else {
+			recordValueMap[val.RecordID][colIdx] = nil
+		}
 	}
 
-	// 6. Reconstruct rows
+	// 6. Reconstruct all rows
 	var rows [][]string
 	for _, record := range records {
 		row := make([]string, len(fields))
-		for idx := range fields {
-			if v, ok := recordValueMap[record.ID][idx]; ok {
-				row[idx] = v
+		colMap := recordValueMap[record.ID]
+
+		for i := 0; i < len(fields); i++ {
+			if colMap != nil {
+				if val, ok := colMap[i]; ok && val != nil {
+					row[i] = *val
+				} else {
+					row[i] = ""
+				}
 			} else {
-				row[idx] = ""
+				row[i] = ""
 			}
 		}
 		rows = append(rows, row)
@@ -182,6 +193,10 @@ func (s *DatasetService) SearchDatasetByName(ctx context.Context, userID uuid.UU
 		Limit:   limit,
 		Offset:  offset,
 	})
+}
+
+func (s *DatasetService) GetColumnsForDataset(ctx context.Context, datasetID uuid.UUID) ([]string, error) {
+	return s.Repo.Queries.GetDatasetFieldsForDataset(ctx, datasetID)
 }
 
 func (s *DatasetService) UploadDataset(ctx context.Context, userID uuid.UUID, filename string, file io.Reader) (database.Dataset, error) {

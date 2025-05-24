@@ -196,6 +196,6 @@ func TestLoginUser_Success(t *testing.T) {
 	assert.NotNil(t, tokenCookie, "token cookie should be set")
 	assert.True(t, tokenCookie.HttpOnly, "token cookie should be HttpOnly")
 	assert.Equal(t, "/", tokenCookie.Path)
-	assert.Equal(t, "localhost", tokenCookie.Domain)
+	assert.Equal(t, "", tokenCookie.Domain)
 	assert.NotEmpty(t, tokenCookie.Value, "token cookie value should not be empty")
 }

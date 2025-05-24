@@ -6,21 +6,24 @@ import { defaultOptions } from './utils/chartUtils';
 
 ChartJS.register(MatrixController, MatrixElement, CategoryScale, LinearScale, Tooltip, Title);
 
+export function heatmapColorScale(value) {
+  if (typeof value !== "number") return "rgba(0, 0, 0, 0)"; // fallback for missing
+  const r = Math.floor(255 * (1 - value));
+  const b = Math.floor(255 * value);
+  return `rgb(${r}, 0, ${b})`;
+}
+
 export function MatrixChart({ labels, datasets, title }) {
   const data = {
     labels, // Not used directly — labels come from the matrix structure
     datasets: datasets.map((d) => ({
       label: d.label,
       data: d.data, // Array of {x: colIndex, y: rowIndex, v: value}
-      backgroundColor: (ctx) => {
-        const value = ctx.raw.v;
-        // Simple red-blue scale
-        const r = Math.floor(255 * (1 - value));
-        const b = Math.floor(255 * value);
-        return `rgb(${r}, 0, ${b})`;
-      },
-      width: ({ chart }) => chart.chartArea.width / labels.length,
-      height: ({ chart }) => chart.chartArea.height / labels.length,
+      backgroundColor: (ctx) => heatmapColorScale(ctx.raw?.v),
+      width: ({ chart }) =>
+        chart.chartArea?.width ? chart.chartArea.width / labels.length : 10,
+      height: ({ chart }) =>
+        chart.chartArea?.height ? chart.chartArea.height / labels.length : 10,
     })),
   };
 
@@ -43,10 +46,16 @@ export function MatrixChart({ labels, datasets, title }) {
     plugins: {
       tooltip: {
         callbacks: {
-          title: (ctx) => `(${ctx[0].raw.x}, ${ctx[0].raw.y})`,
-          label: (ctx) => `Value: ${ctx.raw.v}`,
+          title: (ctx) => {
+            const { x, y } = ctx[0]?.raw || {};
+            return `(${x ?? "?"}, ${y ?? "?"})`;
+          },
+          label: (ctx) => {
+            const v = ctx.raw?.v;
+            return `Value: ${typeof v === "number" ? v.toFixed(3) : "N/A"}`;
+          },
         },
-      },
+      }
     },
   };
 

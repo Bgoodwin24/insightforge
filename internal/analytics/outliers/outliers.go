@@ -28,33 +28,34 @@ func ZScoreOutliers(data []float64, threshold float64) ([]int, error) {
 			outliers = append(outliers, i)
 		}
 	}
+	if len(outliers) == 0 {
+		return []int{}, nil
+	}
 	return outliers, nil
 }
 
-func IQROutliers(data []float64) ([]int, error) {
+func IQROutliers(data []float64) ([]int, float64, float64, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("data cannot be empty")
+		return nil, 0, 0, fmt.Errorf("data cannot be empty")
 	}
-
-	sort.Float64s(data)
 
 	Q1, _, Q3, err := Quantiles(data)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
 	IQR := Q3 - Q1
-	lowerOutlier := Q1 - 1.5*IQR
-	upperOutlier := Q3 + 1.5*IQR
+	lowerBound := Q1 - 1.5*IQR
+	upperBound := Q3 + 1.5*IQR
 
-	var outliers []int
+	var indices []int
 	for i, value := range data {
-		if value < lowerOutlier || value > upperOutlier {
-			outliers = append(outliers, i)
+		if value < lowerBound || value > upperBound {
+			indices = append(indices, i)
 		}
 	}
 
-	return outliers, nil
+	return indices, lowerBound, upperBound, nil
 }
 
 func BoxPlotData(data []float64) (Q1, Q3, IQR, lowerOutlier, upperOutlier float64, err error) {
@@ -79,38 +80,27 @@ func FormatBoxPlotForChartJS(Q1, Q3, lowerOutlier, upperOutlier float64) (labels
 	return labels, values
 }
 
-func Quantiles(data []float64) (Q1, Q2, Q3 float64, err error) {
+func Quantiles(data []float64) (float64, float64, float64, error) {
 	if len(data) == 0 {
-		return 0, 0, 0, fmt.Errorf("data must not be empty")
+		return 0, 0, 0, fmt.Errorf("data cannot be empty")
 	}
 
 	sort.Float64s(data)
 
-	median, err := descriptives.Median(data)
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("error calculating median of data: %v", data)
+	getPercentile := func(p float64) float64 {
+		index := p * float64(len(data)-1)
+		lower := int(index)
+		upper := lower + 1
+		if upper >= len(data) {
+			return data[lower]
+		}
+		weight := index - float64(lower)
+		return data[lower]*(1-weight) + data[upper]*weight
 	}
 
-	mid := len(data) / 2
-	var lowerHalf, upperHalf []float64
+	Q1 := getPercentile(0.25)
+	Q2 := getPercentile(0.50)
+	Q3 := getPercentile(0.75)
 
-	if len(data)%2 == 0 {
-		lowerHalf = data[:mid]
-		upperHalf = data[mid:]
-	} else {
-		lowerHalf = data[:mid]
-		upperHalf = data[mid+1:]
-	}
-
-	Q1, err = descriptives.Median(lowerHalf)
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("error calculating Q1 of data: %v", data)
-	}
-
-	Q3, err = descriptives.Median(upperHalf)
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("error calculating Q3 of data: %v", data)
-	}
-
-	return Q1, median, Q3, nil
+	return Q1, Q2, Q3, nil
 }

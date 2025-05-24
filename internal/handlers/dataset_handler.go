@@ -156,6 +156,12 @@ func GetUserIDFromContext(c *gin.Context) (uuid.UUID, bool) {
 	return userID, true
 }
 
+type DatasetResponse struct {
+	ID      uuid.UUID `json:"id"`
+	Name    string    `json:"name"`
+	Columns []string  `json:"columns"`
+}
+
 func (h *DatasetHandler) UploadDataset(c *gin.Context) {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -196,7 +202,17 @@ func (h *DatasetHandler) UploadDataset(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, dataset)
+	columns, err := h.Service.GetColumnsForDataset(c, dataset.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get dataset columns"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, DatasetResponse{
+		ID:      dataset.ID,
+		Name:    dataset.Name,
+		Columns: columns,
+	})
 }
 
 func (h *DatasetHandler) GetDatasetByID(c *gin.Context) {
@@ -209,10 +225,34 @@ func (h *DatasetHandler) GetDatasetByID(c *gin.Context) {
 
 	dataset, authorized := h.CheckDatasetOwnership(c, datasetID)
 	if !authorized {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized to access this dataset"})
 		return
 	}
 
-	c.JSON(http.StatusOK, dataset)
+	columns, err := h.Service.GetColumnsForDataset(c.Request.Context(), datasetID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error fetching dataset columns"})
+		return
+	}
+
+	userID, ok := GetUserIDFromContext(c)
+	if !ok {
+		return
+	}
+
+	_, rows, err := h.Service.GetDatasetRows(c.Request.Context(), datasetID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":         dataset.ID,
+		"name":       dataset.Name,
+		"created_at": dataset.CreatedAt,
+		"columns":    columns,
+		"rows":       rows,
+	})
 }
 
 func (h *DatasetHandler) DeleteDatasetsByID(c *gin.Context) {
@@ -225,6 +265,7 @@ func (h *DatasetHandler) DeleteDatasetsByID(c *gin.Context) {
 
 	dataset, authorized := h.CheckDatasetOwnership(c, datasetID)
 	if !authorized {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized to delete this dataset"})
 		return
 	}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -67,7 +68,7 @@ func (j *JWTManager) Verify(accessToken string) (*Claims, error) {
 	}
 
 	claims, ok := token.Claims.(*Claims)
-	if !ok {
+	if !ok || !token.Valid {
 		return nil, errors.New("invalid claims")
 	}
 
@@ -78,6 +79,7 @@ func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := c.Cookie("token")
 		if err != nil {
+			log.Println("No token cookie found:", err)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authentication token missing"})
 			return
 		}
@@ -85,6 +87,7 @@ func AuthMiddleware(jwtManager *JWTManager) gin.HandlerFunc {
 		// Verify the token string
 		claims, err := jwtManager.Verify(token)
 		if err != nil {
+			log.Println("Invalid token:", err)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 			return
 		}

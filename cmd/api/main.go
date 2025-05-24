@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"net/http"
+
 	"github.com/Bgoodwin24/insightforge/internal/auth"
 	"github.com/Bgoodwin24/insightforge/internal/database"
 	"github.com/Bgoodwin24/insightforge/internal/email"
@@ -18,6 +20,22 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
+
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusOK)
+			return
+		}
+
+		c.Next()
+	}
+}
 
 func main() {
 	// Initialize logger
@@ -68,15 +86,16 @@ func main() {
 
 	// Initialize repository with DB connection
 	repo := &database.Repository{
-		DB: db,
+		DB:      db,
+		Queries: database.New(db),
 	}
 
 	// Set up email configuration (you can load these from environment variables)
 	emailConfig := email.EmailConfig{
-		SMTPServer:   os.Getenv("SMTP_HOST"),
+		SMTPServer:   os.Getenv("SMTP_SERVER"),
 		SMTPPort:     os.Getenv("SMTP_PORT"),
 		SMTPUsername: os.Getenv("SMTP_USERNAME"),
-		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPPassword: os.Getenv("INSIGHTFORGE_SMTP_PASSWORD"),
 		FromEmail:    os.Getenv("FROM_EMAIL"),
 	}
 
@@ -89,6 +108,7 @@ func main() {
 	)
 
 	router := gin.Default()
+	router.Use(CORSMiddleware())
 
 	// Health check route
 	router.GET("/health", func(c *gin.Context) {

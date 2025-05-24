@@ -33,6 +33,7 @@ export function BoxPlotChart({ labels, datasets, title }) {
       backgroundColor: colors[i],
       borderColor: colors[i],
       borderWidth: 1,
+      outlierColor: colors[i],
     })),
   };
 

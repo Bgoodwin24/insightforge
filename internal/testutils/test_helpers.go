@@ -146,12 +146,9 @@ func InsertTestField(t *testing.T, repo *database.Repository, datasetID, fieldID
 }
 
 func InsertTestValueWithRecordID(t *testing.T, repo *database.Repository, datasetID, recordID, fieldID uuid.UUID, value string) {
-	now := time.Now()
+	t.Helper()
 
-	if value == "" {
-		fmt.Println("Empty value detected, skipping insertion")
-		return
-	}
+	now := time.Now()
 
 	// Insert dataset_record only if it doesn't exist
 	_, err := repo.DB.Exec(`
@@ -161,10 +158,17 @@ func InsertTestValueWithRecordID(t *testing.T, repo *database.Repository, datase
 	`, recordID, datasetID, now, now)
 	require.NoError(t, err)
 
+	var sqlValue sql.NullString
+	if value == "" {
+		sqlValue = sql.NullString{Valid: false}
+	} else {
+		sqlValue = sql.NullString{String: value, Valid: true}
+	}
+
 	_, err = repo.DB.Exec(`
 		INSERT INTO record_values (record_id, field_id, value)
 		VALUES ($1, $2, $3)
-	`, recordID, fieldID, value)
+	`, recordID, fieldID, sqlValue)
 	require.NoError(t, err)
 }
 

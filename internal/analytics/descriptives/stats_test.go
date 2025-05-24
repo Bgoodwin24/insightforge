@@ -62,12 +62,12 @@ func TestMode(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []string
-		expected string
+		expected []string
 		wantErr  bool
 	}{
-		{"single mode", []string{"1", "2", "2", "3"}, "2", false},
-		{"multi mode", []string{"1", "1", "2", "2"}, "1", false},
-		{"empty", []string{}, "", true},
+		{"single mode", []string{"1", "2", "2", "3"}, []string{"2"}, false},
+		{"multi mode", []string{"1", "1", "2", "2"}, []string{"1", "2"}, false},
+		{"empty", []string{}, nil, true},
 	}
 
 	for _, tc := range tests {
@@ -75,10 +75,10 @@ func TestMode(t *testing.T) {
 			result, err := descriptives.Mode(tc.input)
 			if tc.wantErr {
 				assert.Error(t, err)
-				assert.Equal(t, "", result)
+				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tc.expected, result)
+				assert.ElementsMatch(t, tc.expected, result)
 			}
 		})
 	}

@@ -36,24 +36,31 @@ func Median(data []float64) (float64, error) {
 	return sortedData[mid], nil
 }
 
-func Mode(data []string) (string, error) {
+func Mode(data []string) ([]string, error) {
 	if len(data) == 0 {
-		return "", errors.New("no data provided")
+		return nil, errors.New("no data provided")
 	}
 
 	freq := make(map[string]int)
 	maxCount := 0
-	var mode string
 
+	// Count frequencies
 	for _, v := range data {
 		freq[v]++
 		if freq[v] > maxCount {
 			maxCount = freq[v]
-			mode = v
 		}
 	}
 
-	return mode, nil
+	// Collect all modes
+	var modes []string
+	for value, count := range freq {
+		if count == maxCount {
+			modes = append(modes, value)
+		}
+	}
+
+	return modes, nil
 }
 
 func StdDev(data []float64) (float64, error) {

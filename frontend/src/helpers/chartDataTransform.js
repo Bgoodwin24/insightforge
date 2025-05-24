@@ -84,11 +84,13 @@ function randomRGBA() {
  * @returns {Object} - An object with `labels` and `datasets` for Chart.js.
  */
 function transformDroppedRowsToChartJS(result, datasetLabel = "Cleaned Dataset") {
+    const [header, ...dataRows] = result.rows;
+
     return {
-        labels: result.rows.map(row => row.join(", ")),
+        labels: dataRows.map(row => row.join(", ")),
         datasets: [{
             label: datasetLabel,
-            data: result.rows,
+            data: dataRows,
             backgroundColor: "rgba(75, 192, 192, 0.5)",
             borderColor: "rgba(75, 192, 192, 1)",
             borderWidth: 1
@@ -105,10 +107,10 @@ function transformDroppedRowsToChartJS(result, datasetLabel = "Cleaned Dataset")
  */
 function transformFilledMissingToChartJS(result, datasetLabel = "Dataset with Filled Values") {
     return {
-        labels: result.rows.map(row => row.join(", ")),
+        labels: result.rows.map((row, idx) => `Row ${idx + 1}`),
         datasets: [{
             label: datasetLabel,
-            data: result.rows,
+            data: result.rows.map(row => Number(row[0])), // flatten + convert to number
             backgroundColor: "rgba(54, 162, 235, 0.5)",
             borderColor: "rgba(54, 162, 235, 1)",
             borderWidth: 1
@@ -117,23 +119,23 @@ function transformFilledMissingToChartJS(result, datasetLabel = "Dataset with Fi
 }
 
 /**
- * Transforms the rows after log transtransformion into Chart.js transform.
+ * Transforms the rows after column normalization into Chart.js format.
  *
- * @param {Object} result - The backend response with `rows` (log-transformed values).
+ * @param {Object} result - The backend response with `rows` ([[original, normalized], ...]).
  * @param {String} datasetLabel - The label for the dataset.
  * @returns {Object} - An object with `labels` and `datasets` for Chart.js.
  */
-function transformLogTransformedToChartJS(result, datasetLabel = "Log-Transformed Dataset") {
-    return {
-        labels: result.rows.map(row => row[0]),
-        datasets: [{
-            label: datasetLabel,
-            data: result.rows,
-            backgroundColor: "rgba(153, 102, 255, 0.5)",
-            borderColor: "rgba(153, 102, 255, 1)",
-            borderWidth: 1
-        }]
-    };
+function transformNormalizedColumnToChartJS(result, datasetLabel = "Normalized Column") {
+  return {
+    labels: result.rows.map(row => row[0]), // original values as labels
+    datasets: [{
+      label: datasetLabel,
+      data: result.rows.map(row => parseFloat(row[1])), // normalized values
+      backgroundColor: "rgba(75, 192, 192, 0.5)",
+      borderColor: "rgba(75, 192, 192, 1)",
+      borderWidth: 1
+    }]
+  };
 }
 
 /**
@@ -143,17 +145,17 @@ function transformLogTransformedToChartJS(result, datasetLabel = "Log-Transforme
  * @param {String} datasetLabel - The label for the dataset.
  * @returns {Object} - An object with `labels` and `datasets` for Chart.js.
  */
-function transformNormalizedColumnToChartJS(result, datasetLabel = "Normalized Dataset") {
-    return {
-        labels: result.rows.map(row => row[0]),
-        datasets: [{
-            label: datasetLabel,
-            data: result.rows,
-            backgroundColor: "rgba(255, 159, 64, 0.5)",
-            borderColor: "rgba(255, 159, 64, 1)",
-            borderWidth: 1
-        }]
-    };
+function transformLogTransformedToChartJS(result, datasetLabel = "Log-Transformed Dataset") {
+  return {
+    labels: result.rows.map(row => row[0]),
+    datasets: [{
+      label: datasetLabel,
+      data: result.rows.map(row => parseFloat(row[0])),
+      backgroundColor: "rgba(153, 102, 255, 0.5)",
+      borderColor: "rgba(153, 102, 255, 1)",
+      borderWidth: 1
+    }]
+  };
 }
 
 /**
@@ -236,38 +238,36 @@ function transformSpearmanForChart(data) {
     };
   }
   
-function transformCorrelationMatrixForChart(data) {
-    const rowLabels = Object.keys(data);
-    const columnSet = new Set();
-  
-    // Collect all unique column keys
-    rowLabels.forEach((row) => {
-      const columns = data[row];
-      Object.keys(columns).forEach((col) => columnSet.add(col));
+function transformCorrelationMatrixForChart(matrix) {
+  const labels = Object.keys(matrix); // row & column labels are the same
+  const data = [];
+
+  labels.forEach((rowLabel, rowIndex) => {
+    const row = matrix[rowLabel];
+    labels.forEach((colLabel, colIndex) => {
+      const value = row[colLabel];
+      if (typeof value === "number") {
+        data.push({
+          x: colLabel,
+          y: rowLabel,
+          v: value,
+        });
+      }
     });
-  
-    const columnLabels = Array.from(columnSet).sort(); // sorted for consistency
-  
-    const datasets = columnLabels.map((col) => {
-      const rowData = rowLabels.map((row) => {
-        const value = data[row][col];
-        return value !== undefined ? value : null;
-      });
-  
-      return {
-        label: col,
-        data: rowData,
-        backgroundColor: randomRGBA(), // Optional: assign a unique color per column
-        borderColor: "rgba(0,0,0,0.1)",
-        borderWidth: 1,
-      };
-    });
-  
-    return {
-      labels: rowLabels,
-      datasets,
-    };
-  }
+  });
+
+  return {
+    labels, // used for axis scaling
+    datasets: [
+      {
+        label: "Correlation Matrix",
+        data, // array of { x, y, v }
+        // chartjs-chart-matrix expects backgroundColor, width, height as callbacks
+        // those are provided in MatrixChart.jsx
+      },
+    ],
+  };
+}
   
 /**
  * Transforms the mean result into Chart.js transform.
@@ -542,21 +542,29 @@ function transformFilteredSortedDataToChartJS(result, headers) {
  * @returns {Object} - An object with `labels` and `datasets` for Chart.js.
  */
 function transformZScoreOutliersToChartJS(result, data) {
-    const outlierIndices = result.indices;
-    const outliers = outlierIndices.map(index => data[index]);
+  console.log("ZScore Raw:", result);
+  console.log("ZScore ColumnData:", data);
 
-    return {
-        labels: data,
-        datasets: [{
-            label: "Data with Outliers",
-            data: data,
-            backgroundColor: data.map((_, index) => 
-                outlierIndices.includes(index) ? "rgba(255, 99, 132, 0.6)" : "rgba(75, 192, 192, 0.5)"
-            ),
-            borderColor: "rgba(75, 192, 192, 1)",
-            borderWidth: 1
-        }]
-    };
+  if (!result?.indices || !Array.isArray(data)) {
+    return { labels: [], datasets: [] };
+  }
+
+  const outlierIndices = new Set(result.indices);
+  const labels = data.map((_, i) => i.toString());
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: "Z-Score Outliers",
+        data: data.map((val, i) =>
+          outlierIndices.has(i) ? val : null
+        ),
+        backgroundColor: "rgba(255, 99, 132, 0.6)",
+      },
+    ],
+    title: result.indices.length > 0 ? "Z-Score Outliers" : "No Z-Score Outliers Found"
+  };
 }
 
 /**
@@ -567,41 +575,58 @@ function transformZScoreOutliersToChartJS(result, data) {
  * @returns {Object} - An object with `labels` and `datasets` for Chart.js.
  */
 function transformIQROutliersToChartJS(result, data) {
-    const outlierIndices = result.indices;
-    const outliers = outlierIndices.map(index => data[index]);
+  console.log("IQR Raw:", result);
+  console.log("IQR ColumnData:", data);
 
-    return {
-        labels: data,
-        datasets: [{
-            label: "Data with Outliers",
-            data: data,
-            backgroundColor: data.map((_, index) => 
-                outlierIndices.includes(index) ? "rgba(255, 99, 132, 0.6)" : "rgba(75, 192, 192, 0.5)"
-            ),
-            borderColor: "rgba(75, 192, 192, 1)",
-            borderWidth: 1
-        }]
-    };
+  if (!result?.indices || !Array.isArray(data)) {
+    return { labels: [], datasets: [] };
+  }
+
+  const outlierIndices = new Set(result.indices);
+  const labels = data.map((_, i) => i.toString());
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: "IQR Outliers",
+        data: data.map((val, i) =>
+          outlierIndices.has(i) ? val : null
+        ),
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+      },
+    ],
+    title: result.indices.length > 0 ? "IQR Outliers" : "No IQR Outliers Found"
+  };
 }
 
 /**
- * Transforms the box plot data into Chart.js transform.
+ * Transforms the box plot data into Chart.js format, including stats.
  *
- * @param {Object} result - The backend response with `labels` and `values` for the box plot.
- * @returns {Object} - An object with `labels` and `datasets` for Chart.js.
+ * @param {Object} result - The backend response with `labels`, `values`, and `stats`.
+ * @returns {Object} - An object with `labels`, `datasets`, and `stats` for Chart.js.
  */
 function transformBoxPlotDataToChartJS(result) {
-    const { labels, values } = result;
+    const { labels, values, stats } = result;
+    console.log("BoxPlot result:", result);
 
     return {
         labels: labels,
         datasets: [{
             label: "Box Plot",
-            data: values,
+            data: values.map(val => ({
+            min: result.stats.lower_outlier,
+            q1: result.stats.Q1,
+            median: (result.stats.Q1 + result.stats.Q3) / 2,
+            q3: result.stats.Q3,
+            max: result.stats.upper_outlier,
+          })),
             backgroundColor: "rgba(153, 102, 255, 0.5)",
             borderColor: "rgba(153, 102, 255, 1)",
-            borderWidth: 1
-        }]
+            borderWidth: 1,
+            outlierColor: "#999",
+        }],
+        stats: stats
     };
 }
 

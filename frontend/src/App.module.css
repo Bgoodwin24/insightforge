@@ -197,3 +197,36 @@
   height: 650px;
   margin-left: 25px;
 }
+
+.selectColumn {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 1rem;
+}
+
+.selectColumn label {
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+}
+
+/* Style the <select> to match your custom buttons */
+.selectColumn select {
+  padding: 10px 15px;
+  background-color: transparent;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  background-color: #8c8c8c;
+}
+
+.selectColumn select:hover {
+  background-color: #a0a0a0;
+}
+
+.selectColumn option {
+  color: black;
+}

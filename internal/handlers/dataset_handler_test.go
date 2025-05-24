@@ -43,11 +43,13 @@ func TestCreateDataset_Success(t *testing.T) {
 	body := `{"name": "My Dataset", "description": "Sample desc"}`
 	req, _ := http.NewRequest(http.MethodPost, "/datasets", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp := httptest.NewRecorder()
-	router.ServeHTTP(resp, req)
+	req.AddCookie(&http.Cookie{Name: "token", Value: token})
+	w := httptest.NewRecorder()
 
-	assert.Equal(t, http.StatusCreated, resp.Code)
+	// Serve the request
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
 }
 
 func TestCreateDataset_Validation(t *testing.T) {
@@ -95,7 +97,10 @@ func TestListDatasets(t *testing.T) {
 	router.GET("/datasets", handler.ListDatasets)
 
 	req, _ := http.NewRequest(http.MethodGet, "/datasets?limit=5", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  "token",
+		Value: token,
+	})
 	resp := httptest.NewRecorder()
 
 	router.ServeHTTP(resp, req)
@@ -124,7 +129,11 @@ func TestSearchDatasets(t *testing.T) {
 	router.GET("/datasets/search", handler.SearchDataSets)
 
 	req, _ := http.NewRequest(http.MethodGet, "/datasets/search?search=Match", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  "token",
+		Value: token,
+	})
+
 	resp := httptest.NewRecorder()
 
 	router.ServeHTTP(resp, req)
@@ -155,7 +164,11 @@ func TestGetDatasetByID(t *testing.T) {
 
 	// Create the request with the authorization header
 	req, _ := http.NewRequest(http.MethodGet, "/datasets/"+dataset.ID.String(), nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  "token",
+		Value: token,
+	})
+
 	resp := httptest.NewRecorder()
 
 	// Perform the request
@@ -188,7 +201,11 @@ func TestDeleteDatasetByID(t *testing.T) {
 
 	// Create the request with the authorization header
 	req, _ := http.NewRequest(http.MethodDelete, "/datasets/"+dataset.ID.String(), nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  "token",
+		Value: token,
+	})
+
 	resp := httptest.NewRecorder()
 
 	// Perform the request
@@ -225,7 +242,10 @@ func TestUpdateDataset_Success(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPut, "/datasets/"+dataset.ID.String(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  "token",
+		Value: token,
+	})
 
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
@@ -280,7 +300,10 @@ func TestUpdateDataset_Forbidden(t *testing.T) {
 	// Make the HTTP PUT request
 	req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/datasets/%s", dataset.ID), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  "token",
+		Value: token,
+	})
 
 	// Record the response
 	resp := httptest.NewRecorder()

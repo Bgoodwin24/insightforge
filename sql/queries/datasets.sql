@@ -76,6 +76,9 @@ FROM dataset_fields
 WHERE dataset_id = $1
 ORDER BY created_at ASC;
 
+-- name: GetDatasetFieldsForDataset :many
+SELECT name FROM dataset_fields WHERE dataset_id = $1 ORDER BY created_at;
+
 -- name: GetRecordsByDatasetID :many
 SELECT id, dataset_id, created_at, updated_at
 FROM dataset_records

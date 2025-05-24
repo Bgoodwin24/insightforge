@@ -9,17 +9,21 @@ import (
 )
 
 func TestDropRowsWithMissing(t *testing.T) {
-	input := [][]string{
+	data := [][]string{
+		{"name", "value"}, // header row
 		{"a", "1"},
 		{"b", ""},
 		{"", "3"},
 		{"c", "2"},
 	}
 	expected := [][]string{
+		{"name", "value"},
 		{"a", "1"},
 		{"c", "2"},
 	}
-	output := cleaning.DropRowsWithMissing(input)
+	columns := []string{"name", "value"}
+
+	output := cleaning.DropRowsWithMissing(data, columns)
 	assert.Equal(t, expected, output)
 }
 
@@ -67,11 +71,14 @@ func TestNormalizeColumn(t *testing.T) {
 		{"b", "2"},
 		{"c", "3"},
 	}
+
 	output, err := cleaning.NormalizeColumn(input, 1)
 	assert.NoError(t, err)
-	assert.InDelta(t, 0.0, mustParseFloat(output[0][1]), 0.0001)
-	assert.InDelta(t, 0.5, mustParseFloat(output[1][1]), 0.0001)
-	assert.InDelta(t, 1.0, mustParseFloat(output[2][1]), 0.0001)
+	assert.Len(t, output, 3)
+
+	assert.InDelta(t, 0.0, output[0], 0.0001)
+	assert.InDelta(t, 0.5, output[1], 0.0001)
+	assert.InDelta(t, 1.0, output[2], 0.0001)
 }
 
 func TestStandardizeColumn(t *testing.T) {

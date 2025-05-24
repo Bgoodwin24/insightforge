@@ -228,10 +228,236 @@ npm start
 sqlc generate
 ``` 
 
-... more to instructions to come
+### Expected Input Formats for Analysis
+InsightForge supports a variety of analysis tools. Most endpoints operate on datasets previously uploaded via CSV. Once uploaded, each dataset receives a unique dataset_id, which users include in query parameters when requesting analysis or transformations.
 
-## Screenshots
-[Will be added when application UI is developed]
+⚠️ **Note: All analysis and transformation endpoints fetch data server-side using the dataset_id, row_fields, columns, or method passed in query parameters — no JSON request bodies are required.**
+
+### Authentication Required
+All dataset-related endpoints require a valid JWT-based session. Requests without proper authentication will be rejected.
+
+### Frontend-Friendly Responses
+All API responses are structured for compatibility with frontend charting libraries (e.g., Chart.js). Output formats are JSON-ready and consistent across endpoints.
+
+### Dataset Upload and ID Usage
+When a CSV is uploaded, InsightForge parses and stores its contents. You then reference the dataset using its dataset_id in the query string of analytics requests.
+
+Example dataset upload returns:
+
+```http
+{
+  "id": "uuid-of-dataset",
+  "name": "uploaded_file.csv",
+}
+```
+
+### Grouped Analytics
+Performs operations grouped by a column (e.g., sum of sales by category).
+
+Example Request:
+
+```http
+GET /analytics/aggregation/grouped-sum?dataset_id=your_uuid&group_by=Gender&column=SpendingScore
+```
+
+Supported endpoints (replace grouped-sum):
+
+grouped-mean
+
+grouped-count
+
+grouped-min
+
+grouped-max
+
+grouped-median
+
+grouped-stddev
+
+Example Response:
+
+```json
+{"results":{"A":25,"B":5}}
+```
+
+### Pivot Table Operations
+Performs pivot-style aggregations across two categorical axes.
+
+Example Request:
+
+```http
+GET /analytics/aggregation/pivot-sum?dataset_id=your_uuid&row_field=Age&column=SpendingScore&value_field=Income
+```
+
+Other pivot endpoints:
+
+pivot-mean
+
+pivot-min
+
+pivot-max
+
+pivot-count
+
+pivot-median
+
+pivot-stddev
+Example Response:
+
+```json
+{"agg_func":"sum","column":"product","results":{"North":{"A":100,"B":200},"South":{"A":300}},"row_field":"region","value_field":"sales"}
+```
+
+# Summary Statistics
+Descriptive stats for a numeric column.
+
+Example Request:
+
+```http
+GET /analytics/descriptives/mean?dataset_id=your_uuid&column=SpendingScore
+```
+
+Other statistic endpoints:
+
+median
+
+mode
+
+standard deviation
+
+variance
+
+min
+
+max
+
+sum
+
+range
+
+count
+
+Example Response:
+
+```json
+{"mean":20}
+```
+
+### Histogram and KDE
+Frequency distributions and kernel density estimates.
+
+Histogram Example:
+
+```http
+GET /analytics/distribution/histogram?dataset_id=your_uuid&column=SpendingScore```
+
+Example Response:
+
+```json
+{"counts":[2,2,2],"labels":["[1.00, 2.67]","[2.67, 4.33]","[4.33, 6.00]"]}
+```
+
+KDE Example:
+```http
+GET /analytics/distribution/kde?dataset_id=your_uuid&column=SpendingScore```
+
+Example Response:
+
+```json
+{"densities":[0.1398939300142934,0.16764869370173405,0.18530902761596366,0.19434288654157703,0.19779647926952248,0.19779647926952248,0.19434288654157708,0.18530902761596366,0.16764869370173408,0.13989393001429343],"labels":["1.00","1.44","1.89","2.33","2.78","3.22","3.67","4.11","4.56","5.00"]}
+```
+
+### Correlation (Pearson, Spearman)
+Analyzes relationships between numeric columns.
+
+Example Request:
+
+```http
+GET /analytics/correlation/pearson-correlation?dataset_id=your_uuid&row_field=Age&column=SpendingScore
+```
+
+Example Response:
+
+Spearman
+```json
+{"results":{"spearman":-1}}
+```
+
+Pearson
+```json
+{"results":{"pearson":1}}
+```
+
+### Correlation Matrix
+Find correlation across all numeric columns.
+
+Example Request:
+
+```http
+GET /analytics/correlation/correlation-matrix?dataset_id=your_uuid&method=pearson&column=SpendingScore&column=Income
+```
+
+Other matrix endpoint
+
+spearman
+
+Example Response:
+
+```json
+{"results":{"a":{"a":1,"b":1},"b":{"a":1,"b":1}}}
+```
+
+### IQR / Box Plot Data
+Computes IQR and box plot summary for a column.
+
+Example Request:
+
+```http
+GET /analytics/outliers/iqr-outliers?dataset_id=your_uuid&column=SpendingScore
+```
+
+```http
+GET /analytics/outliers/boxplot?dataset_id=your_uuid&column=SpendingScore
+```
+
+Example Response:
+
+IQR
+```json
+{
+  "column": "value",
+  "indices": [4],
+  "lowerBound": -7.5,
+  "upperBound": 52.5
+}
+```
+
+BoxPlot
+```json
+{"labels":["Q1","Q3","Lower Outlier","Upper Outlier"],"stats":{"IQR":52.5,"Q1":12.5,"Q3":65,"lower_outlier":-66.25,"upper_outlier":143.75},"values":[12.5,65,-66.25,143.75]}
+```
+
+
+### Z-Score Outlier Detection
+Finds outliers in a column based on z-score threshold.
+
+Example Request:
+
+```http
+GET //analytics/outliers/zscore-outliers?dataset_id=your_uuid&column=SpendingScore
+```
+
+Example Response:
+
+```json
+{"indices":[2]}
+```
+
+## Future Considerations
+The following features are partially implemented and will have their user interface access temporarily disabled:
+Apply Log Transform, Drop Rows With Missing, Fill Missing With, Filter/Sort, Group Dataset By, Normalize Column, and Standardize Column.
+
+Note: Although "Group Dataset By" is not fully exposed in the UI, functionality that depends on it (e.g., Grouped Data Analytics) will continue to work by calling the relevant API endpoints directly.
 
 ## License
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

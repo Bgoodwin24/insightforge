@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"sort"
@@ -44,17 +45,15 @@ type AnalyticsHandler struct {
 	DatasetService *services.DatasetService
 }
 
-const userIDKey = "user_id"
-
 // GetUserFromContext returns the authenticated user's ID from Gin context
 func GetUserFromContext(c *gin.Context) (uuid.UUID, error) {
-	val, exists := c.Get(userIDKey)
+	userIDStr, exists := c.Get("user_id")
 	if !exists {
 		return uuid.Nil, errors.New("user not found in context")
 	}
 
-	userID, ok := val.(uuid.UUID)
-	if !ok {
+	userID, err := uuid.Parse(userIDStr.(string))
+	if err != nil {
 		return uuid.Nil, errors.New("invalid user ID format in context")
 	}
 
@@ -114,8 +113,9 @@ func (h *AnalyticsHandler) GroupedSumHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("Group by: %s | Column: %s", groupBy, column)
 
-	c.JSON(http.StatusOK, aggregation.GroupedSum(grouped))
+	c.JSON(http.StatusOK, gin.H{"results": aggregation.GroupedSum(grouped)})
 }
 
 func (h *AnalyticsHandler) GroupedMeanHandler(c *gin.Context) {
@@ -138,7 +138,7 @@ func (h *AnalyticsHandler) GroupedMeanHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, aggregation.GroupedMean(grouped))
+	c.JSON(http.StatusOK, gin.H{"results": aggregation.GroupedMean(grouped)})
 }
 
 func (h *AnalyticsHandler) GroupedCountHandler(c *gin.Context) {
@@ -180,7 +180,7 @@ func (h *AnalyticsHandler) GroupedCountHandler(c *gin.Context) {
 		grouped[group] = append(grouped[group], 1)
 	}
 
-	c.JSON(http.StatusOK, aggregation.GroupedCount(grouped))
+	c.JSON(http.StatusOK, gin.H{"results": aggregation.GroupedCount(grouped)})
 }
 
 func (h *AnalyticsHandler) GroupedMinHandler(c *gin.Context) {
@@ -203,7 +203,7 @@ func (h *AnalyticsHandler) GroupedMinHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, aggregation.GroupedMin(grouped))
+	c.JSON(http.StatusOK, gin.H{"results": aggregation.GroupedMin(grouped)})
 }
 
 func (h *AnalyticsHandler) GroupedMaxHandler(c *gin.Context) {
@@ -226,7 +226,7 @@ func (h *AnalyticsHandler) GroupedMaxHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, aggregation.GroupedMax(grouped))
+	c.JSON(http.StatusOK, gin.H{"results": aggregation.GroupedMax(grouped)})
 }
 
 func (h *AnalyticsHandler) GroupedMedianHandler(c *gin.Context) {
@@ -249,7 +249,7 @@ func (h *AnalyticsHandler) GroupedMedianHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, aggregation.GroupedMedian(grouped))
+	c.JSON(http.StatusOK, gin.H{"results": aggregation.GroupedMedian(grouped)})
 }
 
 func (h *AnalyticsHandler) GroupedStdDevHandler(c *gin.Context) {
@@ -272,15 +272,15 @@ func (h *AnalyticsHandler) GroupedStdDevHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, aggregation.GroupedStdDev(grouped))
+	c.JSON(http.StatusOK, gin.H{"results": aggregation.GroupedStdDev(grouped)})
 }
 
 type PivotRequest struct {
-	RowField    string                   `json:"row_field"`
-	ColumnField string                   `json:"column_field"`
-	ValueField  string                   `json:"value_field"`
-	AggFunc     string                   `json:"agg_func"`
-	Data        []map[string]interface{} `json:"data"`
+	RowField   string                   `json:"row_field"`
+	Column     string                   `json:"column"`
+	ValueField string                   `json:"value_field"`
+	AggFunc    string                   `json:"agg_func"`
+	Data       []map[string]interface{} `json:"data"`
 }
 
 func (h *AnalyticsHandler) PivotTableHandler(c *gin.Context) {
@@ -306,7 +306,7 @@ func (h *AnalyticsHandler) PivotTableHandler(c *gin.Context) {
 
 	// Parse query parameters for pivot settings
 	rowField := c.Query("row_field")
-	colField := c.Query("column_field")
+	colField := c.Query("column")
 	valField := c.Query("value_field")
 	aggFunc := c.Query("agg_func")
 	if aggFunc == "" {
@@ -391,10 +391,20 @@ func (h *AnalyticsHandler) PivotTableHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, pivotTable)
+	c.JSON(http.StatusOK, gin.H{
+		"results":     pivotTable,
+		"row_field":   rowField,
+		"column":      colField,
+		"value_field": valField,
+		"agg_func":    aggFunc,
+	})
 }
 
 // Cleaning
+type DropRowsWithMissingRequest struct {
+	Columns []string `json:"columns" binding:"required"`
+}
+
 func (h *DatasetHandler) DropRowsWithMissingHandler(c *gin.Context) {
 	userID, err := GetUserFromContext(c)
 	if err != nil {
@@ -402,20 +412,34 @@ func (h *DatasetHandler) DropRowsWithMissingHandler(c *gin.Context) {
 		return
 	}
 
-	datasetIDStr := c.Query("datasetID")
+	datasetIDStr := c.Query("dataset_id")
 	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset ID"})
 		return
 	}
 
-	_, rows, err := h.Service.GetDatasetRows(c, datasetID, userID)
+	var req DropRowsWithMissingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("BindJSON error: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+		return
+	}
+
+	if len(req.Columns) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Columns are required"})
+		return
+	}
+
+	header, rows, err := h.Service.GetDatasetRows(c, datasetID, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch dataset"})
 		return
 	}
 
-	cleanedRows := cleaning.DropRowsWithMissing(rows)
+	full := append([][]string{header}, rows...)
+	cleanedRows := cleaning.DropRowsWithMissing(full, req.Columns)
+
 	c.JSON(http.StatusOK, gin.H{"rows": cleanedRows})
 }
 
@@ -426,7 +450,7 @@ func (h *DatasetHandler) FillMissingWithHandler(c *gin.Context) {
 		return
 	}
 
-	datasetIDStr := c.Query("datasetID")
+	datasetIDStr := c.Query("dataset_id")
 	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset ID"})
@@ -456,7 +480,7 @@ func (h *DatasetHandler) ApplyLogTransformationHandler(c *gin.Context) {
 		return
 	}
 
-	datasetIDStr := c.Query("datasetID")
+	datasetIDStr := c.Query("dataset_id")
 	colStr := c.Query("col")
 
 	if datasetIDStr == "" || colStr == "" {
@@ -498,7 +522,7 @@ func (h *DatasetHandler) NormalizeColumnHandler(c *gin.Context) {
 		return
 	}
 
-	datasetIDStr := c.Query("datasetID")
+	datasetIDStr := c.Query("dataset_id")
 	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset ID"})
@@ -552,7 +576,7 @@ func (h *DatasetHandler) StandardizeColumnHandler(c *gin.Context) {
 		return
 	}
 
-	datasetIDStr := c.Query("datasetID")
+	datasetIDStr := c.Query("dataset_id")
 	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset ID"})
@@ -567,9 +591,14 @@ func (h *DatasetHandler) StandardizeColumnHandler(c *gin.Context) {
 		return
 	}
 
-	_, rows, err := h.Service.GetDatasetRows(c, datasetID, userID)
+	headers, rows, err := h.Service.GetDatasetRows(c, datasetID, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load dataset rows"})
+		return
+	}
+
+	if req.Column < 0 || req.Column >= len(headers) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid column index"})
 		return
 	}
 
@@ -579,14 +608,26 @@ func (h *DatasetHandler) StandardizeColumnHandler(c *gin.Context) {
 		return
 	}
 
+	// Convert to float64 slice for Chart.js-compatible JSON
+	columnData := make([]float64, 0, len(standardized))
+	for _, row := range standardized {
+		valStr := row[req.Column]
+		val, err := strconv.ParseFloat(valStr, 64)
+		if err != nil {
+			continue // skip invalid values
+		}
+		columnData = append(columnData, val)
+	}
+
+	colName := headers[req.Column]
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Column standardized successfully",
-		"data":    standardized,
+		colName: columnData,
 	})
 }
 
 func (h *DatasetHandler) DropColumnsHandler(c *gin.Context) {
-	datasetIDStr := c.Param("datasetID")
+	datasetIDStr := c.Param("dataset_id")
 	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset ID"})
@@ -622,7 +663,7 @@ func (h *DatasetHandler) RenameColumnsHandler(c *gin.Context) {
 		return
 	}
 
-	datasetIDStr := c.Param("id")
+	datasetIDStr := c.Param("dataset_id")
 	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset ID"})
@@ -672,45 +713,65 @@ func TransposeFloat(data [][]float64) [][]float64 {
 }
 
 func (h *DatasetHandler) PearsonHandler(c *gin.Context) {
+	datasetID, row_field, column := c.Query("dataset_id"), c.Query("row_field"), c.Query("column")
+	id, err := uuid.Parse(datasetID)
+	if err != nil || row_field == "" || column == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid dataset_id, row_field, or column"})
+		return
+	}
+
 	userID, err := GetUserFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	datasetIDStr := c.Param("id")
-	datasetID, err := uuid.Parse(datasetIDStr)
+	headers, rows, err := h.Service.GetDatasetRows(c, id, userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset ID"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load dataset"})
 		return
 	}
 
-	var req struct {
-		XColumn int `json:"x_column"`
-		YColumn int `json:"y_column"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-		return
-	}
-
-	_, rows, err := h.Service.GetDatasetRows(c, datasetID, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	data := []map[string]interface{}{}
+	for _, row := range rows {
+		if len(row) != len(headers) {
+			continue
+		}
+		record := make(map[string]interface{})
+		for i, col := range headers {
+			record[col] = row[i]
+		}
+		data = append(data, record)
 	}
 
 	var xVals, yVals []float64
-	for _, row := range rows {
-		if req.XColumn >= len(row) || req.YColumn >= len(row) {
+	for _, record := range data {
+		xRaw, xOk := record[row_field]
+		yRaw, yOk := record[column]
+		if !xOk || !yOk {
 			continue
 		}
-		x, xErr := strconv.ParseFloat(row[req.XColumn], 64)
-		y, yErr := strconv.ParseFloat(row[req.YColumn], 64)
+
+		xStr, xIsStr := xRaw.(string)
+		yStr, yIsStr := yRaw.(string)
+		if !xIsStr || !yIsStr {
+			continue
+		}
+
+		x, xErr := strconv.ParseFloat(xStr, 64)
+		y, yErr := strconv.ParseFloat(yStr, 64)
 		if xErr == nil && yErr == nil {
 			xVals = append(xVals, x)
 			yVals = append(yVals, y)
 		}
+	}
+
+	if len(xVals) < 2 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":        "Not enough numeric data to compute correlation",
+			"valid_points": len(xVals),
+		})
+		return
 	}
 
 	r, err := correlation.PearsonCorrelation(xVals, yVals)
@@ -719,49 +780,73 @@ func (h *DatasetHandler) PearsonHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"pearson": r})
+	c.JSON(http.StatusOK, gin.H{"results": gin.H{"pearson": r}})
 }
 
 func (h *DatasetHandler) SpearmanHandler(c *gin.Context) {
+	datasetID := c.Query("dataset_id")
+	xColumn := c.Query("row_field")
+	yColumn := c.Query("column")
+
+	id, err := uuid.Parse(datasetID)
+	if err != nil || xColumn == "" || yColumn == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid dataset_id, row_field, or column"})
+		return
+	}
+
 	userID, err := GetUserFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	datasetIDStr := c.Param("id")
-	datasetID, err := uuid.Parse(datasetIDStr)
+	headers, rows, err := h.Service.GetDatasetRows(c, id, userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset ID"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load dataset"})
 		return
 	}
 
-	var req struct {
-		XColumn int `json:"x_column"`
-		YColumn int `json:"y_column"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-		return
-	}
-
-	_, rows, err := h.Service.GetDatasetRows(c, datasetID, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	// Convert [][]string → []map[string]interface{}
+	data := []map[string]interface{}{}
+	for _, row := range rows {
+		if len(row) != len(headers) {
+			continue
+		}
+		record := make(map[string]interface{})
+		for i, col := range headers {
+			record[col] = row[i]
+		}
+		data = append(data, record)
 	}
 
 	var xVals, yVals []float64
-	for _, row := range rows {
-		if req.XColumn >= len(row) || req.YColumn >= len(row) {
+	for _, record := range data {
+		xRaw, xOk := record[xColumn]
+		yRaw, yOk := record[yColumn]
+		if !xOk || !yOk {
 			continue
 		}
-		x, xErr := strconv.ParseFloat(row[req.XColumn], 64)
-		y, yErr := strconv.ParseFloat(row[req.YColumn], 64)
+
+		xStr, xIsStr := xRaw.(string)
+		yStr, yIsStr := yRaw.(string)
+		if !xIsStr || !yIsStr {
+			continue
+		}
+
+		x, xErr := strconv.ParseFloat(xStr, 64)
+		y, yErr := strconv.ParseFloat(yStr, 64)
 		if xErr == nil && yErr == nil {
 			xVals = append(xVals, x)
 			yVals = append(yVals, y)
 		}
+	}
+
+	if len(xVals) < 2 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":        "Not enough numeric data to compute correlation",
+			"valid_points": len(xVals),
+		})
+		return
 	}
 
 	r, err := correlation.SpearmanCorrelation(xVals, yVals)
@@ -770,7 +855,7 @@ func (h *DatasetHandler) SpearmanHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"spearman": r})
+	c.JSON(http.StatusOK, gin.H{"results": gin.H{"spearman": r}})
 }
 
 func (h *DatasetHandler) CorrelationMatrixHandler(c *gin.Context) {
@@ -780,33 +865,69 @@ func (h *DatasetHandler) CorrelationMatrixHandler(c *gin.Context) {
 		return
 	}
 
-	datasetIDStr := c.Param("id")
+	datasetIDStr := c.Query("dataset_id")
 	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset ID"})
 		return
 	}
 
-	var req struct {
-		Columns []int  `json:"columns"`
-		Method  string `json:"method"` // "pearson" or "spearman"
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+	method := c.Query("method")
+	if method != "pearson" && method != "spearman" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or missing method (must be 'pearson' or 'spearman')"})
 		return
 	}
 
-	_, rows, err := h.Service.GetDatasetRows(c, datasetID, userID)
+	headerNames, rows, err := h.Service.GetDatasetRows(c, datasetID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load dataset"})
 		return
 	}
 
-	// Clean up and convert to float64
+	columnNames := c.QueryArray("column")
+	// Optional: support fallback for comma-separated values
+	if len(columnNames) == 1 && strings.Contains(columnNames[0], ",") {
+		columnNames = strings.Split(columnNames[0], ",")
+		for i := range columnNames {
+			columnNames[i] = strings.TrimSpace(columnNames[i])
+		}
+	}
+
+	var columnIndices []int
+
+	if len(columnNames) == 0 {
+		// Default to all columns
+		for i := range headerNames {
+			columnIndices = append(columnIndices, i)
+		}
+	} else {
+		for _, name := range columnNames {
+			name = strings.TrimSpace(name)
+			found := false
+			for i, header := range headerNames {
+				if header == name {
+					columnIndices = append(columnIndices, i)
+					found = true
+					break
+				}
+			}
+			if !found {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Column not found: %s", name)})
+				return
+			}
+		}
+	}
+
+	if len(columnIndices) < 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least two columns are required to compute a correlation matrix."})
+		return
+	}
+
+	// Clean and extract numeric values
 	clean := make([][]float64, 0, len(rows))
 	for _, row := range rows {
 		var numericRow []float64
-		for _, colIdx := range req.Columns {
+		for _, colIdx := range columnIndices {
 			if colIdx >= len(row) {
 				numericRow = append(numericRow, 0)
 				continue
@@ -822,86 +943,90 @@ func (h *DatasetHandler) CorrelationMatrixHandler(c *gin.Context) {
 
 	transposed := TransposeFloat(clean)
 
-	matrix, err := correlation.CorrelationMatrix(transposed, req.Columns, req.Method)
+	matrix, err := correlation.CorrelationMatrix(transposed, columnIndices, method)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	headers, err := h.Service.GetDatasetHeaders(c, datasetID, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get headers"})
-		return
-	}
-
 	result := make(map[string]map[string]float64)
 	for i, row := range matrix {
-		headerI := headers[req.Columns[i]]
+		headerI := headerNames[columnIndices[i]]
 		if headerI == "" {
-			headerI = fmt.Sprintf("Col%d", req.Columns[i])
+			headerI = fmt.Sprintf("Col%d", columnIndices[i])
 		}
 		result[headerI] = make(map[string]float64)
 		for j, val := range row {
-			headerJ := headers[req.Columns[j]]
+			headerJ := headerNames[columnIndices[j]]
 			if headerJ == "" {
-				headerJ = fmt.Sprintf("Col%d", req.Columns[j])
+				headerJ = fmt.Sprintf("Col%d", columnIndices[j])
 			}
 			result[headerI][headerJ] = val
 		}
 	}
 
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, gin.H{"results": result})
 }
 
 // Descriptive Stats
-func getDatasetAndUserIDFromContext(c *gin.Context) (uuid.UUID, uuid.UUID, error) {
-	datasetIDStr := c.Query("dataset_id")
-	datasetID, err := uuid.Parse(datasetIDStr)
-	if err != nil {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid dataset_id")
-	}
-
-	userIDVal, exists := c.Get("userID")
-	if !exists {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("user not authenticated")
-	}
-
-	userID, ok := userIDVal.(uuid.UUID)
-	if !ok {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid user ID type")
-	}
-
-	return datasetID, userID, nil
-}
-
 func (h *AnalyticsHandler) MeanHandler(c *gin.Context) {
-	column := c.Query("column")
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	// Extract userID from context
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
 		return
 	}
 
+	// Parse datasetID from query parameter
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	// Get the column name
+	column := c.Query("column")
+	if column == "" {
+		c.JSON(400, gin.H{"error": "missing 'column' query parameter"})
+		return
+	}
+
+	// Call service to get numeric data
 	data, err := h.DatasetService.GetNumericColumnValues(c, datasetID, userID, column)
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Calculate mean
 	mean, err := descriptives.Mean(data)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Return JSON response exactly as before
 	c.JSON(200, gin.H{"mean": mean})
 }
 
 func (h *AnalyticsHandler) MedianHandler(c *gin.Context) {
-	column := c.Query("column")
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	column := c.Query("column")
+	if column == "" {
+		c.JSON(400, gin.H{"error": "missing 'column' query parameter"})
 		return
 	}
 
@@ -921,10 +1046,22 @@ func (h *AnalyticsHandler) MedianHandler(c *gin.Context) {
 }
 
 func (h *AnalyticsHandler) ModeHandler(c *gin.Context) {
-	column := c.Query("column")
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	column := c.Query("column")
+	if column == "" {
+		c.JSON(400, gin.H{"error": "missing 'column' query parameter"})
 		return
 	}
 
@@ -934,7 +1071,6 @@ func (h *AnalyticsHandler) ModeHandler(c *gin.Context) {
 		return
 	}
 
-	// Optional: Validate column exists
 	colIndex := -1
 	for i, h := range headers {
 		if h == column {
@@ -954,20 +1090,45 @@ func (h *AnalyticsHandler) ModeHandler(c *gin.Context) {
 		}
 	}
 
-	modes, err := descriptives.Mode(values)
+	// Get mode(s) as strings
+	modeStrings, err := descriptives.Mode(values)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(200, gin.H{"mode": modes})
+	// Convert to []float64
+	var numericModes []float64
+	for _, s := range modeStrings {
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			// If conversion fails, fallback to returning string mode
+			c.JSON(200, gin.H{"mode": modeStrings})
+			return
+		}
+		numericModes = append(numericModes, f)
+	}
+
+	c.JSON(200, gin.H{"mode": numericModes})
 }
 
 func (h *AnalyticsHandler) StdDevHandler(c *gin.Context) {
-	column := c.Query("column")
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	column := c.Query("column")
+	if column == "" {
+		c.JSON(400, gin.H{"error": "missing 'column' query parameter"})
 		return
 	}
 
@@ -987,10 +1148,22 @@ func (h *AnalyticsHandler) StdDevHandler(c *gin.Context) {
 }
 
 func (h *AnalyticsHandler) VarianceHandler(c *gin.Context) {
-	column := c.Query("column")
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	column := c.Query("column")
+	if column == "" {
+		c.JSON(400, gin.H{"error": "missing 'column' query parameter"})
 		return
 	}
 
@@ -1010,10 +1183,22 @@ func (h *AnalyticsHandler) VarianceHandler(c *gin.Context) {
 }
 
 func (h *AnalyticsHandler) MinHandler(c *gin.Context) {
-	column := c.Query("column")
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	column := c.Query("column")
+	if column == "" {
+		c.JSON(400, gin.H{"error": "missing 'column' query parameter"})
 		return
 	}
 
@@ -1033,10 +1218,22 @@ func (h *AnalyticsHandler) MinHandler(c *gin.Context) {
 }
 
 func (h *AnalyticsHandler) MaxHandler(c *gin.Context) {
-	column := c.Query("column")
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	column := c.Query("column")
+	if column == "" {
+		c.JSON(400, gin.H{"error": "missing 'column' query parameter"})
 		return
 	}
 
@@ -1056,10 +1253,22 @@ func (h *AnalyticsHandler) MaxHandler(c *gin.Context) {
 }
 
 func (h *AnalyticsHandler) RangeHandler(c *gin.Context) {
-	column := c.Query("column")
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	column := c.Query("column")
+	if column == "" {
+		c.JSON(400, gin.H{"error": "missing 'column' query parameter"})
 		return
 	}
 
@@ -1079,10 +1288,22 @@ func (h *AnalyticsHandler) RangeHandler(c *gin.Context) {
 }
 
 func (h *AnalyticsHandler) SumHandler(c *gin.Context) {
-	column := c.Query("column")
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
+		return
+	}
+
+	column := c.Query("column")
+	if column == "" {
+		c.JSON(400, gin.H{"error": "missing 'column' query parameter"})
 		return
 	}
 
@@ -1102,9 +1323,16 @@ func (h *AnalyticsHandler) SumHandler(c *gin.Context) {
 }
 
 func (h *AnalyticsHandler) CountHandler(c *gin.Context) {
-	datasetID, userID, err := getDatasetAndUserIDFromContext(c)
+	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(401, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	datasetIDStr := c.Query("dataset_id")
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid dataset ID"})
 		return
 	}
 
@@ -1166,44 +1394,44 @@ func (h *AnalyticsHandler) HistogramHandler(c *gin.Context) {
 	})
 }
 
-func getDatasetIDAndColumnFromQuery(c *gin.Context) (uuid.UUID, string, error) {
+func (h *AnalyticsHandler) KDEHandler(c *gin.Context) {
 	datasetIDStr := c.Query("dataset_id")
 	column := c.Query("column")
 	if datasetIDStr == "" || column == "" {
-		return uuid.Nil, "", errors.New("missing dataset_id or column in query")
-	}
-	datasetID, err := uuid.Parse(datasetIDStr)
-	if err != nil {
-		return uuid.Nil, "", errors.New("invalid dataset_id")
-	}
-	return datasetID, column, nil
-}
-
-func (h *AnalyticsHandler) KDEHandler(c *gin.Context) {
-	datasetID, columnName, err := getDatasetIDAndColumnFromQuery(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing dataset_id or column"})
 		return
 	}
 
-	numPoints, _ := strconv.Atoi(c.DefaultQuery("num_points", "100"))
-	bandwidth, _ := strconv.ParseFloat(c.DefaultQuery("bandwidth", "1.0"), 64)
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset_id"})
+		return
+	}
+
+	numPointsStr := c.DefaultQuery("num_points", "100")
+	bandwidthStr := c.DefaultQuery("bandwidth", "1.0")
+
+	numPoints, err := strconv.Atoi(numPointsStr)
+	if err != nil || numPoints <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid num_points"})
+		return
+	}
+
+	bandwidth, err := strconv.ParseFloat(bandwidthStr, 64)
+	if err != nil || bandwidth <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid bandwidth"})
+		return
+	}
 
 	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	_, _, err = h.DatasetService.GetDatasetRows(c.Request.Context(), userID, datasetID)
+	numericData, err := h.DatasetService.GetNumericColumnValues(c.Request.Context(), datasetID, userID, column)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	numericData, err := h.DatasetService.GetNumericColumnValues(c.Request.Context(), userID, datasetID, columnName)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to extract column: %v", err)})
 		return
 	}
 
@@ -1223,23 +1451,33 @@ func (h *AnalyticsHandler) KDEHandler(c *gin.Context) {
 
 // FilterSort
 func (h *DatasetHandler) FilterSortHandler(c *gin.Context) {
-	datasetID, _, err := getDatasetIDAndColumnFromQuery(c)
+	datasetIDStr := c.Query("dataset_id")
+	if datasetIDStr == "" {
+		log.Println("Missing dataset_id")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing dataset_id"})
+		return
+	}
+	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Printf("Invalid dataset_id: %v\n", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset_id"})
 		return
 	}
 
 	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	headers, rows, err := h.Service.GetDatasetRows(c.Request.Context(), userID, datasetID)
+	headers, rows, err := h.Service.GetDatasetRows(c.Request.Context(), datasetID, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	log.Printf("Direct call headers: %v", headers)
+	log.Printf("Direct call rows count: %d", len(rows))
+	log.Printf("Headers: %v, rows count: %d\n", headers, len(rows))
 
 	filterColumn := c.DefaultQuery("filter_col", "")
 	filterOp := c.DefaultQuery("filter_op", "")
@@ -1256,19 +1494,25 @@ func (h *DatasetHandler) FilterSortHandler(c *gin.Context) {
 			break
 		}
 	}
-	if colIndex == -1 {
+	if colIndex == -1 && filterColumn != "" {
+		log.Printf("Invalid filter column: %s\n", filterColumn)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter column"})
 		return
 	}
 
 	var filtered [][]string
-	for _, row := range rows {
-		val, err := strconv.Atoi(row[colIndex])
-		if err != nil {
-			continue
-		}
-		if filterOp == "gt" && val > filterVal {
-			filtered = append(filtered, row)
+	if filterColumn == "" {
+		filtered = rows // no filter
+	} else {
+		for _, row := range rows {
+			val, err := strconv.Atoi(row[colIndex])
+			if err != nil {
+				continue
+			}
+			if filterOp == "gt" && val > filterVal {
+				filtered = append(filtered, row)
+			}
+			// Add other filterOps as needed here...
 		}
 	}
 
@@ -1292,7 +1536,7 @@ func (h *DatasetHandler) FilterSortHandler(c *gin.Context) {
 		}
 	}
 
-	var response []map[string]interface{}
+	response := make([]map[string]interface{}, 0, len(filtered))
 	for _, row := range filtered {
 		obj := map[string]interface{}{}
 		for i, val := range row {
@@ -1306,17 +1550,29 @@ func (h *DatasetHandler) FilterSortHandler(c *gin.Context) {
 
 // Outliers
 func (h *AnalyticsHandler) ZScoreOutliersHandler(c *gin.Context) {
-	datasetID, columnName, err := getDatasetIDAndColumnFromQuery(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	datasetIDStr := c.Query("dataset_id")
+	columnName := c.Query("column")
+	if datasetIDStr == "" || columnName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing dataset_id or column"})
 		return
 	}
 
-	threshold, _ := strconv.ParseFloat(c.DefaultQuery("threshold", "2.0"), 64)
+	datasetID, err := uuid.Parse(datasetIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset_id"})
+		return
+	}
+
+	thresholdStr := c.DefaultQuery("threshold", "2.0")
+	threshold, err := strconv.ParseFloat(thresholdStr, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid threshold"})
+		return
+	}
 
 	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -1326,7 +1582,7 @@ func (h *AnalyticsHandler) ZScoreOutliersHandler(c *gin.Context) {
 		return
 	}
 
-	data, err := h.DatasetService.GetNumericColumnValues(c.Request.Context(), userID, datasetID, columnName)
+	data, err := h.DatasetService.GetNumericColumnValues(c.Request.Context(), datasetID, userID, columnName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -1337,20 +1593,32 @@ func (h *AnalyticsHandler) ZScoreOutliersHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	fmt.Println("Zscore Parsed column values:", data)
+	fmt.Println("Zscore Outlier indices:", indices)
 
+	if indices == nil {
+		indices = []int{}
+	}
 	c.JSON(http.StatusOK, gin.H{"indices": indices})
 }
 
 func (h *AnalyticsHandler) IQROutliersHandler(c *gin.Context) {
-	datasetID, columnName, err := getDatasetIDAndColumnFromQuery(c)
+	datasetIDStr := c.Query("dataset_id")
+	columnName := c.Query("column")
+	if datasetIDStr == "" || columnName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing dataset_id or column"})
+		return
+	}
+
+	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset_id"})
 		return
 	}
 
 	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -1360,31 +1628,50 @@ func (h *AnalyticsHandler) IQROutliersHandler(c *gin.Context) {
 		return
 	}
 
-	data, err := h.DatasetService.GetNumericColumnValues(c.Request.Context(), userID, datasetID, columnName)
+	data, err := h.DatasetService.GetNumericColumnValues(c.Request.Context(), datasetID, userID, columnName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	indices, err := outliers.IQROutliers(data)
+	indices, lowerBound, upperBound, err := outliers.IQROutliers(data)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"indices": indices})
+	fmt.Println("IQR Parsed column values:", data)
+	fmt.Println("IQR Outlier indices:", indices)
+
+	if indices == nil {
+		indices = []int{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"indices":    indices,
+		"column":     columnName,
+		"lowerBound": lowerBound,
+		"upperBound": upperBound,
+	})
 }
 
 func (h *AnalyticsHandler) BoxPlotHandler(c *gin.Context) {
-	datasetID, columnName, err := getDatasetIDAndColumnFromQuery(c)
+	datasetIDStr := c.Query("dataset_id")
+	columnName := c.Query("column")
+	if datasetIDStr == "" || columnName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing dataset_id or column"})
+		return
+	}
+
+	datasetID, err := uuid.Parse(datasetIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid dataset_id"})
 		return
 	}
 
 	userID, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -1394,7 +1681,7 @@ func (h *AnalyticsHandler) BoxPlotHandler(c *gin.Context) {
 		return
 	}
 
-	data, err := h.DatasetService.GetNumericColumnValues(c.Request.Context(), userID, datasetID, columnName)
+	data, err := h.DatasetService.GetNumericColumnValues(c.Request.Context(), datasetID, userID, columnName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

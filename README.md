@@ -1,7 +1,12 @@
 # InsightForge
 
 ## Project Overview
-A web application that allows users to upload datasets and explore them through visualizations and analysis tools.
+A single page web application that allows users to upload datasets and explore them through visualizations and analysis tools.
+
+## Screenshots
+  ![Bar Charts](./frontend/public/assets/analytics-preview.png)
+  ![Line Charts](./frontend/public/assets/analytics-preview2.png)
+  ![Box Plots](./frontend/public/assets/analytics-preview3.png)
 
 ## Architecture
 ```mermaid

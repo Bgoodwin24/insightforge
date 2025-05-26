@@ -487,8 +487,17 @@ Note: Although "Group Dataset By" is not fully exposed in the UI, functionality 
 For other security related updates intended for if this were to ever be launched for production see SECURITY.md.
 
 ## License
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-This project is licensed under the terms of the MIT license.
+## License
+
+This project is licensed under a **custom restrictive license**.
+
+© 2025 Bgoodwin24. All rights reserved.
+
+The software and associated documentation files (the "Software") are provided solely for your personal, non-commercial use.
+
+You may **NOT** copy, modify, distribute, sublicense, sell, or otherwise exploit the Software in any way without explicit prior written permission from the copyright holder.
+
+For full license details, see the [LICENSE](LICENSE) file.
 
 ## Author
 Bgoodwin24

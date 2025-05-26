@@ -16,6 +16,12 @@ import {
   transformPearsonForChart,
   transformSpearmanForChart,
   transformCorrelationMatrixForChart,
+  transformMeanMedianToChartJS,
+  transformStdDevVarianceToChartJS,
+  transformMinMaxToChartJS,
+  transformRangeStdDevToChartJS,
+  transformModeMedianToChartJS,
+  transformSumCountToChartJS,
   transformMeanToChartJS,
   transformMedianToChartJS,
   transformModeToChartJS,
@@ -116,45 +122,144 @@ const normalizeMethodKey = (method) => {
 
 export default function App() {
   const [modalType, setModalType] = useState(null);
-  const [user, setUser] = useState(undefined); // Track the logged-in user
+  const [user, setUser] = useState(null);
   const [activeDataset, setActiveDataset] = useState(null);
   const [method, setMethod] = useState(null);
   const [labels, setLabels] = useState([]);
   const [datasets, setDatasets] = useState([]);
   const [title, setTitle] = useState("");
+  const [errorDisabled, setErrorDisabled] = useState(false);
 
-  const isUserLoaded = user !== undefined;
+  const [isUserLoaded, setIsUserLoaded] = useState(false);
 
   const closeModal = () => setModalType(null);
 
-    useEffect(() => {
-      // On mount, try fetching the logged-in user profile
-      const fetchUserProfile = async () => {
-        try {
-          const res = await fetch("http://localhost:8080/user/profile", {
-            method: "GET",
-            credentials: "include",
-          });
-          if (res.status === 401) {
-            // Not logged in — expected
-            console.debug("User not logged in yet");
-            setUser(null);
-            return;
-          }
+    const fetchUserProfile = async () => {
+    try {
+      const res = await fetch("http://localhost:8080/user/profile", {
+        method: "GET",
+        credentials: "include",
+      });
 
-          if (!res.ok) {
-            throw new Error("Unexpected error fetching user profile");
-          }
+      if (res.status === 401) {
+        console.debug("User not logged in or session expired");
+        setUser(null);
+        localStorage.removeItem("user");
+        return;
+      }
 
-          const data = await res.json();
-          setUser(data);
-        } catch (err) {
-          console.error("Error fetching user profile:", err.message);
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      setUser(data);
+      localStorage.setItem("user", JSON.stringify(data));
+    } catch (err) {
+      console.error("Error fetching user profile:", err.message);
+      setUser(null);
+      localStorage.removeItem("user");
+    } finally {
+      setIsUserLoaded(true);
+    }
+  };
+
+  useEffect(() => {
+    // Restore cached dataset
+    const stored = localStorage.getItem("activeDataset");
+    if (stored) {
+      try {
+        setActiveDataset(JSON.parse(stored));
+      } catch (err) {
+        console.error("Failed to parse stored dataset:", err);
+      }
+    }
+
+    // Restore cached user
+    const cached = localStorage.getItem("user");
+    if (cached) {
+      setUser(JSON.parse(cached));
+    }
+
+    // Always revalidate session
+    fetchUserProfile();
+  }, []);
+
+  useEffect(() => {
+    const restoreDataset = async () => {
+      const stored = localStorage.getItem("activeDataset");
+      if (!stored) return;
+
+      try {
+        const parsed = JSON.parse(stored);
+
+        if (activeDataset && activeDataset.id === parsed.id) {
+          return;
         }
-      };
 
-      fetchUserProfile();
-    }, []);
+        const res = await fetch(`http://localhost:8080/datasets/${parsed.id}`, {
+          credentials: "include",
+        });
+
+        if (!res.ok) {
+          throw new Error("Dataset not found on server");
+        }
+
+        const fullDataset = await res.json();
+        setActiveDataset(fullDataset);
+      } catch (err) {
+        console.warn("Invalid cached dataset removed:", err.message);
+        localStorage.removeItem("activeDataset");
+        setActiveDataset(null);
+      }
+    };
+
+    if (isUserLoaded && !activeDataset) {
+      restoreDataset();
+    }
+  }, [isUserLoaded]);
+
+  useEffect(() => {
+    const shouldLogout = sessionStorage.getItem("logoutOnReload") === "true";
+
+    if (shouldLogout) {
+      fetch("http://localhost:8080/user/logout", {
+        method: "POST",
+        credentials: "include",
+      }).finally(() => {
+        sessionStorage.removeItem("logoutOnReload");
+        window.location.reload(); // force refresh to clear state
+      });
+      return; // Don't continue initializing app state
+    }
+
+    // 2. Restore cached user from localStorage
+    const cached = localStorage.getItem("user");
+    if (cached) {
+      setUser(JSON.parse(cached));
+    }
+
+    // 3. Restore cached dataset from localStorage
+    const stored = localStorage.getItem("activeDataset");
+    if (stored) {
+      try {
+        setActiveDataset(JSON.parse(stored));
+      } catch (err) {
+        console.error("Failed to parse stored dataset:", err);
+      }
+    }
+
+    // 4. Always revalidate session
+    fetchUserProfile();
+  }, []);
+
+    useEffect(() => {
+      if (activeDataset) {
+        localStorage.setItem("activeDataset", JSON.stringify(activeDataset));
+      } else {
+        localStorage.removeItem("activeDataset");
+      }
+    }, [activeDataset]);
 
   const handleUploadSuccess = async (datasetInfo) => {
     console.log("Upload success data:", datasetInfo);
@@ -192,28 +297,32 @@ export default function App() {
   };
 
   const handleDatasetDelete = async () => {
-    console.log(activeDataset);
-    console.log("Calling delete for", activeDataset?.id);
     if (!activeDataset?.id) {
-      console.log("No active dataset/ dataset_ID found");
+      console.log("No active dataset / dataset_ID found");
       return;
     }
-    console.log(activeDataset);
-    console.log("Calling delete for", activeDataset?.id);
 
-    const res = await fetch(`http://localhost:8080/datasets/${activeDataset.id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
+    try {
+      const res = await fetch(`http://localhost:8080/datasets/${activeDataset.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
 
-    if (res.ok) {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Delete failed");
+        return;
+      }
+
       setActiveDataset(null);
+      localStorage.removeItem("activeDataset");
+
       setTimeout(() => {
         closeModal();
       }, 5);
-    } else {
-      const err = await res.json().catch(() => ({}));
-      alert(err.error || "Delete failed");
+    } catch (err) {
+      console.error("Error deleting dataset:", err);
+      alert("Delete failed");
     }
   };
 
@@ -290,6 +399,31 @@ export default function App() {
     return ["correlation-matrix"].includes(method);
   }
 
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('verify_token');
+
+    if (!token) return;
+
+    fetch("http://localhost:8080/user/set-verify-cookie", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    })
+      .then(() => {
+        return fetch("http://localhost:8080/user/verify", {
+          method: "POST",
+          credentials: "include",
+        });
+      })
+      .then(() => {
+        window.history.replaceState(null, "", "/verify-success");
+        window.location.href = "/verify-success";
+      });
+  }, []);
+
   const handleSelect = async (group, method, extraMethod = null) => {
     if (!activeDataset?.id) return;
 
@@ -329,13 +463,8 @@ export default function App() {
       return;
     }
 
-    console.log("Rows:", activeDataset?.rows);
-    console.log("First row:", activeDataset?.rows?.[0]);
-
     const colIndex = activeDataset.columns.findIndex(c => c === defaultColumn);
     const columnData = activeDataset.rows.map(row => row[colIndex]);
-  
-    console.log("Active Dataset:", activeDataset);
 
     let url = `http://localhost:8080/analytics/${group}/${method}?dataset_id=${activeDataset?.id}`;
 
@@ -367,53 +496,180 @@ export default function App() {
       url += `&value_field=${encodeURIComponent(defaultValue)}`;
     }
 
-    console.log("Requesting:", url);
-
-    console.log("defaultColumn:", defaultColumn);
-    console.log("defaultGroupBy:", defaultGroupBy);
-    console.log("columnData:", columnData);
-
     try {
       const res = await fetch(url, {
         method: "GET",
         credentials: "include",
       });
-      const raw = await res.json();
 
-      console.log("raw:", raw);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Unknown error");
+      }
+
+      setErrorDisabled(false);
+
+      const raw = await res.json();
 
       let transformed;
       switch (method) {
-        case 'median':
-          transformed = transformMedianToChartJS(raw);
-          break;
         case 'mean':
-          transformed = transformMeanToChartJS(raw);
+        case 'median': {
+          const baseUrl = "http://localhost:8080/analytics";
+          const datasetId = activeDataset?.id;
+
+          const [meanRes, medianRes] = await Promise.all([
+            fetch(`${baseUrl}/descriptives/mean?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+            fetch(`${baseUrl}/descriptives/median?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+          ]);
+
+          if (!meanRes.ok || !medianRes.ok) {
+            throw new Error("Failed to fetch mean or median");
+          }
+
+          const meanRaw = await meanRes.json();
+          const medianRaw = await medianRes.json();
+
+          // Merge mean and median responses
+          const merged = meanRaw.results.map((meanItem, idx) => ({
+            label: meanItem.label,
+            mean: meanItem.value,
+            median: medianRaw.results[idx]?.value,
+          }));
+
+          transformed = transformMeanMedianToChartJS(merged);
           break;
+        }
         case 'mode':
-          transformed = transformModeToChartJS(raw);
+        case 'median': {
+          const baseUrl = "http://localhost:8080/analytics";
+          const datasetId = activeDataset?.id;
+
+          const [modeRes, medianRes] = await Promise.all([
+            fetch(`${baseUrl}/descriptives/mode?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+            fetch(`${baseUrl}/descriptives/median?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+          ]);
+
+          if (!modeRes.ok || !medianRes.ok) {
+            throw new Error("Failed to fetch mean or median");
+          }
+
+          const modeRaw = await modeRes.json();
+          const medianRaw = await medianRes.json();
+
+          const merged = modeRaw.results.map((modeItem, idx) => ({
+            label: modeItem.label,
+            mean: modeItem.value,
+            median: medianRaw.results[idx]?.value,
+          }));
+
+          transformed = transformModeMedianToChartJS(merged);
           break;
-        case 'variance':
-          transformed = transformVarianceToChartJS(raw);
-          break;
+        }
         case 'min':
-          transformed = transformMinToChartJS(raw);
+        case 'max': {
+          const baseUrl = "http://localhost:8080/analytics";
+          const datasetId = activeDataset?.id;
+
+          const [minRes, maxRes] = await Promise.all([
+            fetch(`${baseUrl}/descriptives/min?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+            fetch(`${baseUrl}/descriptives/max?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+          ]);
+
+          if (!minRes.ok || !maxRes.ok) {
+            throw new Error("Failed to fetch mean or median");
+          }
+
+          const minRaw = await minRes.json();
+          const maxRaw = await maxRes.json();
+
+          const merged = minRaw.results.map((minItem, idx) => ({
+            label: minItem.label,
+            mean: minItem.value,
+            median: maxRaw.results[idx]?.value,
+          }));
+
+          transformed = transformMinMaxToChartJS(merged);
           break;
-        case 'max':
-          transformed = transformMaxToChartJS(raw);
-          break;
+        }
         case 'range':
-          transformed = transformRangeToChartJS(raw);
+        case 'stddev': {
+          const baseUrl = "http://localhost:8080/analytics";
+          const datasetId = activeDataset?.id;
+
+          const [rangeRes, stddevRes] = await Promise.all([
+            fetch(`${baseUrl}/descriptives/range?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+            fetch(`${baseUrl}/descriptives/stddev?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+          ]);
+
+          if (!rangeRes.ok || !stddevRes.ok) {
+            throw new Error("Failed to fetch mean or median");
+          }
+
+          const rangeRaw = await rangeRes.json();
+          const stddevRaw = await stddevRes.json();
+
+          const merged = rangeRaw.results.map((rangeItem, idx) => ({
+            label: rangeItem.label,
+            mean: rangeItem.value,
+            median: stddevRaw.results[idx]?.value,
+          }));
+
+          transformed = transformRangeStdDevToChartJS(merged);
           break;
+        }
         case 'sum':
-          transformed = transformSumToChartJS(raw);
+        case 'count': {
+          const baseUrl = "http://localhost:8080/analytics";
+          const datasetId = activeDataset?.id;
+
+          const [sumRes, countRes] = await Promise.all([
+            fetch(`${baseUrl}/descriptives/sum?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+            fetch(`${baseUrl}/descriptives/count?dataset_id=${datasetId}`, { credentials: "include" }),
+          ]);
+
+          if (!sumRes.ok || !countRes.ok) {
+            throw new Error("Failed to fetch mean or median");
+          }
+
+          const sumRaw = await sumRes.json();
+          const countRaw = await countRes.json();
+
+          const merged = sumRaw.results.map((sumItem, idx) => ({
+            label: sumItem.label,
+            mean: sumItem.value,
+            median: countRaw.results[idx]?.value,
+          }));
+
+          transformed = transformSumCountToChartJS(merged);
           break;
-        case 'count':
-          transformed = transformCountToChartJS(raw);
-          break;
+        }
         case 'stddev':
-          transformed = transformStdDevToChartJS(raw);
+        case 'variance': {
+          const baseUrl = "http://localhost:8080/analytics";
+          const datasetId = activeDataset?.id;
+
+          const [stdDevRes, varianceRes] = await Promise.all([
+            fetch(`${baseUrl}/descriptives/stddev?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+            fetch(`${baseUrl}/descriptives/variance?dataset_id=${datasetId}&column=${defaultColumn}`, { credentials: "include" }),
+          ]);
+
+          if (!stdDevRes.ok || !varianceRes.ok) {
+            throw new Error("Failed to fetch mean or median");
+          }
+
+          const stdDevRaw = await stdDevRes.json();
+          const varianceRaw = await varianceRes.json();
+
+          const merged = stdDevRaw.results.map((stdDevItem, idx) => ({
+            label: stdDevItem.label,
+            mean: stdDevItem.value,
+            median: varianceRaw.results[idx]?.value,
+          }));
+
+          transformed = transformStdDevVarianceToChartJS(merged);
           break;
+        }
         case 'histogram':
           transformed = transformHistogramToChartJS(raw);
           break;
@@ -473,14 +729,12 @@ export default function App() {
           break;
         case 'correlation-matrix':
           transformed = transformCorrelationMatrixForChart(raw.results);
-          console.log("Matrix response:", transformed);
           break;
         default:
           console.error(`No transform defined for method: ${method}`);
           throw new Error(`Unsupported analysis method: ${method}`);
       }
       const normalizedMethod = normalizeMethodKey(method);
-      console.log(`Chart type for method "${method}" (normalized: "${normalizedMethod}") → ${chartTypeByMethod[normalizedMethod]}`);
 
       // Update chart state
       setLabels(transformed.labels);
@@ -488,6 +742,23 @@ export default function App() {
       setTitle(transformed.title);
       setMethod(method);
     } catch (err) {
+      if (err.message === "Failed to fetch" || err.message === "NetworkError") {
+        try {
+          await fetch("http://localhost:8080/user/logout", {
+            method: "POST",
+            credentials: "include",
+          });
+        } catch (_) {
+          sessionStorage.setItem("logoutOnReload", "true");
+        }
+
+        setErrorDisabled(true);
+        setUser(null);
+        localStorage.removeItem("user");
+        setTimeout(() => {
+        alert("Network error, you have been logged out.");
+      }, 50)
+      }
       console.error('API error:', err);
     }
   };
@@ -537,12 +808,12 @@ export default function App() {
 
           <DropdownMenu
             label="Aggregation"
-            disabled={!activeDataset}
+            disabled={!activeDataset || errorDisabled || user === null}
             options={[
               {
                 text: "Grouped Data",
                 children: [
-                  { text: "Grouped By", onClick: () => handleSelect("aggregation", "grouped-by") },
+                  /*{ text: "Grouped By", onClick: () => handleSelect("aggregation", "grouped-by") },*/
                   { text: "Grouped Sum", onClick: () => handleSelect("aggregation", "grouped-sum") },
                   { text: "Grouped Mean", onClick: () => handleSelect("aggregation", "grouped-mean") },
                   { text: "Grouped Count", onClick: () => handleSelect("aggregation", "grouped-count") },
@@ -568,20 +839,8 @@ export default function App() {
           />
 
           <DropdownMenu
-              label="Cleaning"
-              disabled={!activeDataset}
-              options={[
-                { text: "Dropped Rows", onClick: () => handleSelect("cleaning", "drop-rows-with-missing") },
-                { text: "Fill Missing With", onClick: () => handleSelect("cleaning", "fill-missing-with") },
-                { text: "Log Transform", onClick: () => handleSelect("cleaning", "apply-log-transformation") },
-                { text: "Normalize Column", onClick: () => handleSelect("cleaning", "normalize-column") },
-                { text: "Standardize Column", onClick: () => handleSelect("cleaning", "standardize-column") },
-              ]}
-            />
-
-          <DropdownMenu
             label="Correlation"
-            disabled={!activeDataset}
+            disabled={!activeDataset || errorDisabled || user === null}
             options={[
               { text: "Pearson", onClick: () => handleSelect("correlation", "pearson-correlation") },
               { text: "Spearman", onClick: () => handleSelect("correlation", "spearman-correlation") },
@@ -603,24 +862,20 @@ export default function App() {
 
           <DropdownMenu
             label="Descriptive Statistics"
-            disabled={!activeDataset}
+            disabled={!activeDataset || errorDisabled || user === null}
             options={[
-              { text: "Mean", onClick: () => handleSelect("descriptives", "mean") },
-              { text: "Median", onClick: () => handleSelect("descriptives", "median") },
+              { text: "Mean/Median", onClick: () => handleSelect("descriptives", "mean") },
               { text: "Mode", onClick: () => handleSelect("descriptives", "mode") },
-              { text: "Standard Deviation", onClick: () => handleSelect("descriptives", "stddev") },
+              { text: "Spread (Std Dev/Range)", onClick: () => handleSelect("descriptives", "stddev") },
               { text: "Variance", onClick: () => handleSelect("descriptives", "variance") },
-              { text: "Min", onClick: () => handleSelect("descriptives", "min") },
-              { text: "Max", onClick: () => handleSelect("descriptives", "max") },
-              { text: "Sum", onClick: () => handleSelect("descriptives", "sum") },
-              { text: "Range", onClick: () => handleSelect("descriptives", "range") },
-              { text: "Count", onClick: () => handleSelect("descriptives", "count") },
+              { text: "Min/Max", onClick: () => handleSelect("descriptives", "min") },
+              { text: "Sum/Count", onClick: () => handleSelect("descriptives", "sum") },
             ]}
           />
 
           <DropdownMenu
             label="Distribution"
-            disabled={!activeDataset}
+            disabled={!activeDataset || errorDisabled || user === null}
             options={[
               { text: "Histogram", onClick: () => handleSelect("distribution", "histogram") },
               { text: "KDE", onClick: () => handleSelect("distribution", "kde") },
@@ -628,16 +883,8 @@ export default function App() {
           />
 
           <DropdownMenu
-            label="Filter Sort"
-            disabled={!activeDataset}
-            options={[
-              { text: "Filter Sort", onClick: () => handleSelect("filtersort", "filter-sort") },
-            ]}
-          />
-
-          <DropdownMenu
             label="Outliers"
-            disabled={!activeDataset}
+            disabled={!activeDataset || errorDisabled || user === null}
             options={[
               { text: "Z Score", onClick: () => handleSelect("outliers", "zscore-outliers") },
               { text: "IQR", onClick: () => handleSelect("outliers", "iqr-outliers") },
@@ -665,8 +912,8 @@ export default function App() {
           {modalType === "auth" && (
             <Modal title="Login / Register" onClose={closeModal}>
               <AuthForm
-                onSuccess={(userData) => {
-                  setUser(userData);
+                onSuccess={async () => {
+                  await fetchUserProfile();
                   closeModal();
                 }}
               />

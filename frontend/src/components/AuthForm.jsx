@@ -32,16 +32,26 @@ export default function AuthForm({ mode = "login", onSuccess }) {
   if (res.ok) {
     const data = await res.json().catch(() => ({}));
 
-    // Use returned data if present, otherwise fallback to form inputs
-    onSuccess({
-      username: data.username || username,
-      email: data.email || email,
-    });
-  } else {
-      const err = await res.json().catch(() => ({}));
-      alert(err.error || `${formMode} failed`);
+    if (formMode === "login") {
+      onSuccess({
+        username: data.username || username,
+        email: data.email || email,
+      });
+    } else {
+      onSuccess();
+      setTimeout(() => {
+        alert("Check your email for a registration link.");
+      }, 50);
     }
-  };
+  } else {
+    const err = await res.json().catch(() => ({}));
+    if (formMode === "login") {
+      alert(err.error || "Invalid username or password.");
+    } else {
+      alert(err.error || "Registration failed.");
+    }
+  }
+};
 
   const isFormValid =
   email.trim() !== "" &&

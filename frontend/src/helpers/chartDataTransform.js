@@ -268,6 +268,151 @@ function transformCorrelationMatrixForChart(matrix) {
     ],
   };
 }
+
+/**
+ * Transforms mean and median into a comparative Chart.js format.
+ *
+ * @param {Object} result - The backend response (e.g., { mean: 50, median: 40 }).
+ * @param {String} columnName - The column being analyzed (e.g., "Spending Score").
+ * @returns {Object} Chart.js config with two bars (mean & median).
+ */
+function transformMeanMedianToChartJS(data) {
+  return {
+    labels: data.map((d) => d.label),
+    datasets: [
+      {
+        label: "Mean",
+        data: data.map((d) => d.mean),
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+        borderColor: "rgba(54, 162, 235, 1)",
+        borderWidth: 1,
+      },
+      {
+        label: "Median",
+        data: data.map((d) => d.median),
+        backgroundColor: "rgba(255, 205, 86, 0.6)",
+        borderColor: "rgba(255, 205, 86, 1)",
+        borderWidth: 1,
+      },
+    ],
+    title: "Grouped Mean and Median",
+  };
+}
+
+function transformStdDevVarianceToChartJS(data) {
+  return {
+    labels: data.map((d) => d.label),
+    datasets: [
+      {
+        label: "Std Dev",
+        data: data.map((d) => d.mean),
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+        borderColor: "rgba(54, 162, 235, 1)",
+        borderWidth: 1,
+      },
+      {
+        label: "Variance",
+        data: data.map((d) => d.median),
+        backgroundColor: "rgba(255, 205, 86, 0.6)",
+        borderColor: "rgba(255, 205, 86, 1)",
+        borderWidth: 1,
+      },
+    ],
+    title: "Grouped Std Dev and Variance",
+  };
+}
+
+function transformMinMaxToChartJS(data) {
+  return {
+    labels: data.map((d) => d.label),
+    datasets: [
+      {
+        label: "Min",
+        data: data.map((d) => d.mean),
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+        borderColor: "rgba(54, 162, 235, 1)",
+        borderWidth: 1,
+      },
+      {
+        label: "Max",
+        data: data.map((d) => d.median),
+        backgroundColor: "rgba(255, 205, 86, 0.6)",
+        borderColor: "rgba(255, 205, 86, 1)",
+        borderWidth: 1,
+      },
+    ],
+    title: "Grouped Min and Max",
+  };
+}
+
+function transformRangeStdDevToChartJS(data) {
+  return {
+    labels: data.map((d) => d.label),
+    datasets: [
+      {
+        label: "Range",
+        data: data.map((d) => d.mean),
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+        borderColor: "rgba(54, 162, 235, 1)",
+        borderWidth: 1,
+      },
+      {
+        label: "Std Dev",
+        data: data.map((d) => d.median),
+        backgroundColor: "rgba(255, 205, 86, 0.6)",
+        borderColor: "rgba(255, 205, 86, 1)",
+        borderWidth: 1,
+      },
+    ],
+    title: "Grouped Range and Std Dev",
+  };
+}
+
+function transformSumCountToChartJS(data) {
+  return {
+    labels: data.map((d) => d.label),
+    datasets: [
+      {
+        label: "Sum",
+        data: data.map((d) => d.mean),
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+        borderColor: "rgba(54, 162, 235, 1)",
+        borderWidth: 1,
+      },
+      {
+        label: "Count",
+        data: data.map((d) => d.median),
+        backgroundColor: "rgba(255, 205, 86, 0.6)",
+        borderColor: "rgba(255, 205, 86, 1)",
+        borderWidth: 1,
+      },
+    ],
+    title: "Grouped Sum and Count",
+  };
+}
+
+function transformModeMedianToChartJS(data) {
+  return {
+    labels: data.map((d) => d.label),
+    datasets: [
+      {
+        label: "Mode",
+        data: data.map((d) => d.mean),
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+        borderColor: "rgba(54, 162, 235, 1)",
+        borderWidth: 1,
+      },
+      {
+        label: "Median",
+        data: data.map((d) => d.median),
+        backgroundColor: "rgba(255, 205, 86, 0.6)",
+        borderColor: "rgba(255, 205, 86, 1)",
+        borderWidth: 1,
+      },
+    ],
+    title: "Grouped Mode and Median",
+  };
+}
   
 /**
  * Transforms the mean result into Chart.js transform.
@@ -542,9 +687,6 @@ function transformFilteredSortedDataToChartJS(result, headers) {
  * @returns {Object} - An object with `labels` and `datasets` for Chart.js.
  */
 function transformZScoreOutliersToChartJS(result, data) {
-  console.log("ZScore Raw:", result);
-  console.log("ZScore ColumnData:", data);
-
   if (!result?.indices || !Array.isArray(data)) {
     return { labels: [], datasets: [] };
   }
@@ -575,9 +717,6 @@ function transformZScoreOutliersToChartJS(result, data) {
  * @returns {Object} - An object with `labels` and `datasets` for Chart.js.
  */
 function transformIQROutliersToChartJS(result, data) {
-  console.log("IQR Raw:", result);
-  console.log("IQR ColumnData:", data);
-
   if (!result?.indices || !Array.isArray(data)) {
     return { labels: [], datasets: [] };
   }
@@ -608,7 +747,6 @@ function transformIQROutliersToChartJS(result, data) {
  */
 function transformBoxPlotDataToChartJS(result) {
     const { labels, values, stats } = result;
-    console.log("BoxPlot result:", result);
 
     return {
         labels: labels,
@@ -641,6 +779,12 @@ export {
     transformPearsonForChart,
     transformSpearmanForChart,
     transformCorrelationMatrixForChart,
+    transformMeanMedianToChartJS,
+    transformStdDevVarianceToChartJS,
+    transformMinMaxToChartJS,
+    transformRangeStdDevToChartJS,
+    transformSumCountToChartJS,
+    transformModeMedianToChartJS,
     transformMeanToChartJS,
     transformMedianToChartJS,
     transformModeToChartJS,

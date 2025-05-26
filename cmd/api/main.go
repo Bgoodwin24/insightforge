@@ -133,7 +133,8 @@ func main() {
 	userGroup := router.Group("/user")
 	{
 		userGroup.POST("/register", userHandler.RegisterUser)
-		userGroup.GET("/verify", userHandler.VerifyEmail)
+		userGroup.POST("/verify", userHandler.VerifyEmail)
+		userGroup.POST("/set-verify-cookie", userHandler.SetVerifyTokenCookie)
 		userGroup.POST("/login", userHandler.LoginUser)
 		userGroup.POST("/logout", userHandler.LogoutUser)
 		userGroup.GET("/profile", auth.AuthMiddleware(jwtManager), userHandler.GetMyProfile)

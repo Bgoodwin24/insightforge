@@ -51,7 +51,7 @@ func NewUserHandler(userService *services.UserService, mailer email.Mailer, jwtM
 }
 
 func (h *UserHandler) RegisterUser(c *gin.Context) {
-	API_URL := os.Getenv("API_URL")
+	FRONTEND_URL := os.Getenv("FRONTEND_URL")
 
 	// Get IP address
 	ip := c.ClientIP()
@@ -140,7 +140,7 @@ func (h *UserHandler) RegisterUser(c *gin.Context) {
 	}
 
 	// Send verification email
-	verificationLink := fmt.Sprintf("%s/user/verify?token=%s", API_URL, pendingUser.Token)
+	verificationLink := fmt.Sprintf("%s/verify?verify_token=%s", FRONTEND_URL, pendingUser.Token)
 	err = h.Mailer.SendVerificationEmail(pendingUser.Email, pendingUser.Username, verificationLink)
 	if err != nil {
 		logger.Logger.Printf("ERROR: Failed to send verification email: %s", err.Error())
@@ -196,30 +196,64 @@ func CheckIPRate(ip string) bool {
 	return attempt.count > maxAttempts
 }
 
+func (h *UserHandler) SetVerifyTokenCookie(c *gin.Context) {
+	var body struct {
+		Token string `json:"token"`
+	}
+	if err := c.BindJSON(&body); err != nil || body.Token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "verify_token",
+		Value:    body.Token,
+		HttpOnly: true,
+		Secure:   false,
+		Path:     "/",
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	c.JSON(http.StatusOK, gin.H{"message": "Token set in cookie"})
+}
+
 // Add a new handler for verification
 func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	FRONTEND_URL := os.Getenv("FRONTEND_URL")
-	token := c.Query("token")
-	if token == "" {
-		c.JSON(400, gin.H{"error": "Invalid verification link"})
+
+	// Read token from cookie, not from URL
+	token, err := c.Cookie("verify_token")
+	if err != nil || token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing verification token"})
 		return
 	}
 
 	user, err := h.UserService.Repo.Queries.GetPendingUserByToken(c.Request.Context(), token)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Verification link is invalid or has expired"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification link is invalid or has expired"})
 		return
 	}
 
-	// Activate user
+	// Activate the user
 	err = h.UserService.ActivateUser(token)
 	if err != nil {
 		logger.Logger.Printf("ERROR: Failed to activate user %s: %s", user.ID, err.Error())
-		c.JSON(500, gin.H{"error": "Failed to verify account"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify account"})
 		return
 	}
 
-	// Redirect or send success
+	// Optionally clear the token cookie after use
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "verify_token",
+		Value:    "",
+		MaxAge:   -1,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Redirect to login or frontend
 	accept := c.GetHeader("Accept")
 	if strings.Contains(accept, "text/html") {
 		c.Redirect(http.StatusFound, fmt.Sprintf("%s/user/login", FRONTEND_URL))
@@ -280,7 +314,7 @@ func (h *UserHandler) LogoutUser(c *gin.Context) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "token",
 		Path:     "/",
-		MaxAge:   -1,
+		MaxAge:   -1000,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   false,
@@ -318,5 +352,9 @@ func (h *UserHandler) GetMyProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, gin.H{
+		"id":       user.ID,
+		"username": user.Username,
+		"email":    user.Email,
+	})
 }

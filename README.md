@@ -326,7 +326,7 @@ Example Request:
 GET /analytics/descriptives/mean?dataset_id=your_uuid&column=SpendingScore
 ```
 
-Other statistic endpoints:
+Replace `mean` with any of the following to access other statistic endpoints:
 
 median
 
@@ -349,8 +349,20 @@ count
 Example Response:
 
 ```json
-{"mean":20}
+{
+  "results": [
+    {
+      "label": "mean",
+      "value": 20
+    }
+  ]
+}
 ```
+Each response includes a `results` array with a single object containing:
+
+- `label`: the type of statistic returned
+
+- `value`: the calculated value (number or array, e.g. for mode)
 
 ### Histogram and KDE
 Frequency distributions and kernel density estimates.
@@ -465,7 +477,9 @@ Example Response:
 ```
 
 ## Future Considerations
-The following features are partially implemented and will have their user interface access temporarily disabled:
+- Enhanced keyboard accessibility (ex: escape to close modals, etc.)
+- The following features are partially implemented and will have their user interface access temporarily disabled:
+
 Apply Log Transform, Drop Rows With Missing, Fill Missing With, Filter/Sort, Group Dataset By, Normalize Column, and Standardize Column.
 
 Note: Although "Group Dataset By" is not fully exposed in the UI, functionality that depends on it (e.g., Grouped Data Analytics) will continue to work by calling the relevant API endpoints directly.

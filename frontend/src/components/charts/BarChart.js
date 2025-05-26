@@ -11,6 +11,8 @@ export function BarChart({ labels, datasets, title }) {
       label: d.label,
       data: d.data,
       backgroundColor: colors[i],
+      barThickness: 100, // Force visible width even on single label
+      maxBarThickness: 120, // Prevent overflow
     })),
   };
 

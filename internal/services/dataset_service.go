@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -199,76 +200,158 @@ func (s *DatasetService) GetColumnsForDataset(ctx context.Context, datasetID uui
 	return s.Repo.Queries.GetDatasetFieldsForDataset(ctx, datasetID)
 }
 
-func (s *DatasetService) UploadDataset(ctx context.Context, userID uuid.UUID, filename string, file io.Reader) (database.Dataset, error) {
+func rowsToDelimited(rows [][]string, delimiter rune) []string {
+	var lines []string
+	sep := string(delimiter)
+	for _, row := range rows {
+		lines = append(lines, strings.Join(row, sep))
+	}
+	return lines
+}
+
+func detectDelimiter(peeked string) rune {
+	if strings.Count(peeked, "\t") > strings.Count(peeked, ",") {
+		return '\t'
+	}
+	return ','
+}
+
+func (s *DatasetService) UploadDataset(
+	ctx context.Context,
+	userID uuid.UUID,
+	filename string,
+	file io.Reader,
+) (database.Dataset, error) {
 	dataset, err := s.CreateDataset(ctx, userID, filename, "Uploaded dataset file")
 	if err != nil {
 		logger.Logger.Printf("Error uploading dataset: %v", err)
 		return database.Dataset{}, err
 	}
 
-	csvReader := csv.NewReader(file)
+	// Peek at the first 512 bytes to detect delimiter
+	peekBuf := make([]byte, 512)
+	n, err := file.Read(peekBuf)
+	if err != nil && err != io.EOF {
+		return dataset, fmt.Errorf("failed to peek file: %w", err)
+	}
+	peeked := string(peekBuf[:n])
+	delimiter := detectDelimiter(peeked)
+	log.Printf("Detected delimiter: %q", delimiter)
+
+	// Reset the reader
+	fullReader := io.MultiReader(strings.NewReader(peeked), file)
+	csvReader := csv.NewReader(fullReader)
+	csvReader.Comma = delimiter
+
 	headers, err := csvReader.Read()
 	if err != nil {
-		return database.Dataset{}, fmt.Errorf("failed to read CSV headers: %w", err)
+		return dataset, fmt.Errorf("failed to read headers: %w", err)
 	}
 
 	const sampleLimit = 100
-
-	// For type inference
 	samples := make([][]string, len(headers))
 	for i := range samples {
 		samples[i] = []string{}
 	}
 
-	// Buffer all rows for later use
-	var allRows [][]string
-	for {
+	var sampleRows [][]string
+	for len(sampleRows) < sampleLimit {
 		row, err := csvReader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return dataset, fmt.Errorf("error reading CSV row: %w", err)
+			log.Printf("Skipping malformed sample row: %v", err)
+			continue
 		}
-
-		allRows = append(allRows, row)
-
-		// Collect samples up to sampleLimit
-		if len(allRows) <= sampleLimit {
-			for i, val := range row {
-				if i < len(samples) {
-					samples[i] = append(samples[i], val)
-				}
+		if len(row) != len(headers) {
+			log.Printf("Skipping malformed sample row: expected %d fields, got %d", len(headers), len(row))
+			continue
+		}
+		sampleRows = append(sampleRows, row)
+		for i, val := range row {
+			if i < len(samples) {
+				samples[i] = append(samples[i], val)
 			}
 		}
 	}
 
-	// Infer types
+	// Infer column types
 	fieldTypes := make([]string, len(headers))
 	for i := range headers {
 		fieldTypes[i] = inferType(samples[i])
 	}
 
+	// Insert fields
 	fieldIDs := make([]uuid.UUID, len(headers))
 	for i, fieldName := range headers {
 		fieldID := uuid.New()
 		fieldIDs[i] = fieldID
-
 		err := s.Repo.Queries.CreateDatasetField(ctx, database.CreateDatasetFieldParams{
 			ID:          fieldID,
 			DatasetID:   dataset.ID,
 			Name:        fieldName,
 			DataType:    fieldTypes[i],
-			Description: sql.NullString{String: "", Valid: false},
+			Description: sql.NullString{Valid: false},
 			CreatedAt:   time.Now(),
 		})
-
 		if err != nil {
 			return database.Dataset{}, fmt.Errorf("failed to insert dataset field: %w", err)
 		}
 	}
 
-	for _, row := range allRows {
+	// Rebuild reader for full parse
+	headerLine := strings.Join(headers, string(delimiter))
+	dataLines := rowsToDelimited(sampleRows, delimiter)
+	reader := io.MultiReader(
+		strings.NewReader(strings.Join(append([]string{headerLine}, dataLines...), "\n")),
+		file,
+	)
+
+	csvReader = csv.NewReader(reader)
+	csvReader.Comma = delimiter
+	_, _ = csvReader.Read() // skip headers
+
+	type recordValue struct {
+		RecordID uuid.UUID
+		FieldID  uuid.UUID
+		Value    sql.NullString
+	}
+
+	const batchSize = 1000
+	var batch []recordValue
+
+	flush := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+		values := make([]database.CreateRecordValueParams, len(batch))
+		for i, v := range batch {
+			values[i] = database.CreateRecordValueParams{
+				RecordID: v.RecordID,
+				FieldID:  v.FieldID,
+				Value:    v.Value,
+			}
+		}
+		err := s.Repo.BatchInsertRecordValues(ctx, values)
+		batch = batch[:0]
+		return err
+	}
+
+	for rowNum := sampleLimit + 2; ; rowNum++ {
+		row, err := csvReader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Printf("Skipping malformed CSV row %d: read error: %v", rowNum, err)
+			continue
+		}
+		if len(row) != len(headers) {
+			log.Printf("Skipping malformed CSV row %d: expected %d fields, got %d", rowNum, len(headers), len(row))
+			continue
+		}
+
 		recordID := uuid.New()
 		err = s.Repo.Queries.CreateDatasetRecord(ctx, database.CreateDatasetRecordParams{
 			ID:        recordID,
@@ -277,21 +360,28 @@ func (s *DatasetService) UploadDataset(ctx context.Context, userID uuid.UUID, fi
 			UpdatedAt: time.Now(),
 		})
 		if err != nil {
-			return dataset, fmt.Errorf("failed to insert dataset record: %w", err)
+			log.Printf("Failed to insert record for row %d: %v", rowNum, err)
+			continue
 		}
 
 		for i, val := range row {
 			val = strings.TrimSpace(val)
-
-			err := s.Repo.Queries.CreateRecordValue(ctx, database.CreateRecordValueParams{
+			batch = append(batch, recordValue{
 				RecordID: recordID,
 				FieldID:  fieldIDs[i],
 				Value:    sql.NullString{String: val, Valid: val != ""},
 			})
-			if err != nil {
-				return dataset, fmt.Errorf("failed to insert record value: %w", err)
+		}
+
+		if len(batch) >= batchSize {
+			if err := flush(); err != nil {
+				return dataset, fmt.Errorf("batch insert failed: %w", err)
 			}
 		}
+	}
+
+	if err := flush(); err != nil {
+		return dataset, fmt.Errorf("final batch insert failed: %w", err)
 	}
 
 	return dataset, nil

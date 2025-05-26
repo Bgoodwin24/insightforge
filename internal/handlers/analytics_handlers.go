@@ -1007,7 +1007,14 @@ func (h *AnalyticsHandler) MeanHandler(c *gin.Context) {
 	}
 
 	// Return JSON response exactly as before
-	c.JSON(200, gin.H{"mean": mean})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "Mean",
+				"value": mean,
+			},
+		},
+	})
 }
 
 func (h *AnalyticsHandler) MedianHandler(c *gin.Context) {
@@ -1042,7 +1049,14 @@ func (h *AnalyticsHandler) MedianHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"median": median})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "Median",
+				"value": median,
+			},
+		},
+	})
 }
 
 func (h *AnalyticsHandler) ModeHandler(c *gin.Context) {
@@ -1109,7 +1123,14 @@ func (h *AnalyticsHandler) ModeHandler(c *gin.Context) {
 		numericModes = append(numericModes, f)
 	}
 
-	c.JSON(200, gin.H{"mode": numericModes})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "Mode",
+				"value": numericModes,
+			},
+		},
+	})
 }
 
 func (h *AnalyticsHandler) StdDevHandler(c *gin.Context) {
@@ -1144,7 +1165,14 @@ func (h *AnalyticsHandler) StdDevHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"stddev": stddev})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "stddev",
+				"value": stddev,
+			},
+		},
+	})
 }
 
 func (h *AnalyticsHandler) VarianceHandler(c *gin.Context) {
@@ -1179,7 +1207,14 @@ func (h *AnalyticsHandler) VarianceHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"variance": math.Round(variance*10000) / 10000})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "variance",
+				"value": math.Round(variance*10000) / 10000,
+			},
+		},
+	})
 }
 
 func (h *AnalyticsHandler) MinHandler(c *gin.Context) {
@@ -1214,7 +1249,14 @@ func (h *AnalyticsHandler) MinHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"min": min})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "min",
+				"value": min,
+			},
+		},
+	})
 }
 
 func (h *AnalyticsHandler) MaxHandler(c *gin.Context) {
@@ -1249,7 +1291,14 @@ func (h *AnalyticsHandler) MaxHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"max": max})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "max",
+				"value": max,
+			},
+		},
+	})
 }
 
 func (h *AnalyticsHandler) RangeHandler(c *gin.Context) {
@@ -1284,7 +1333,14 @@ func (h *AnalyticsHandler) RangeHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"range": rng})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "range",
+				"value": rng,
+			},
+		},
+	})
 }
 
 func (h *AnalyticsHandler) SumHandler(c *gin.Context) {
@@ -1319,7 +1375,14 @@ func (h *AnalyticsHandler) SumHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"sum": sum})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "sum",
+				"value": sum,
+			},
+		},
+	})
 }
 
 func (h *AnalyticsHandler) CountHandler(c *gin.Context) {
@@ -1342,7 +1405,14 @@ func (h *AnalyticsHandler) CountHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"count": len(rows)})
+	c.JSON(200, gin.H{
+		"results": []map[string]interface{}{
+			{
+				"label": "count",
+				"value": len(rows),
+			},
+		},
+	})
 }
 
 // Distribution

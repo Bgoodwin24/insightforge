@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,10 +11,8 @@ import (
 
 	"github.com/Bgoodwin24/insightforge/internal/database"
 	"github.com/Bgoodwin24/insightforge/internal/services"
-	"github.com/Bgoodwin24/insightforge/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 )
 
 type Dataset struct {
@@ -163,13 +162,9 @@ type DatasetResponse struct {
 }
 
 func (h *DatasetHandler) UploadDataset(c *gin.Context) {
-	err := godotenv.Load(".env")
-	if err != nil {
-		logger.Logger.Fatalf("Failed to load .env file: %v", err)
-	}
-
 	userID, ok := GetUserIDFromContext(c)
 	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -198,7 +193,7 @@ func (h *DatasetHandler) UploadDataset(c *gin.Context) {
 
 	dataset, err := h.Service.UploadDataset(c, userID, header.Filename, file)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to upload dataset"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to upload dataset: %v", err)})
 		return
 	}
 

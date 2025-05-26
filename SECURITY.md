@@ -1,38 +1,55 @@
 # Security Policy
+This is a learning/portfolio project implementing security best practices.
 
-This is a learning/portfolio project implementing security best practices. While care has been taken to implement security features, additional measures would be needed for production use.
+While care has been taken to implement strong security features, additional controls would be needed for production deployment.
 
 ## Security Measures Implemented
-
 ### Authentication & User Management
 - Password requirements enforced (minimum 8 characters, requiring uppercase, lowercase, numbers, and special characters)
-- Email validation for registration
-- Rate limiting on registration attempts (maximum 10 attempts per IP address within a 15 minute window)
+
+- Email validation and verification using secure magic links
+
+- Verification tokens stored in HTTP-only cookies (prevents JavaScript access to tokens, protecting against XSS). Secure flag is configurable and should be enabled in production.
+
+- Rate limiting on registration attempts (maximum 10 attempts per IP address within a 15-minute window)
+
 - Security event logging for failed registration attempts
 
 ### Data Protection
-- Passwords are hashed before storage (not stored in plaintext)
-- Input validation on all user-provided data
-- Protection includes: Password security, Brute Force Protection, Rate Limiting, Input Validation, Security Logging, and Account Lockout after multiple failed login attempts
+- Passwords are hashed using a secure algorithm before storage (never stored in plaintext)
+
+- Input validation enforced on all user-provided data
+
+- Measures include: password security, brute-force protection, rate limiting, input validation, security logging, and account lockout after repeated login failures
 
 ### API Security
-- Input validation on all endpoints
-- Rate limiting to prevent abuse
-- Authentication required for protected endpoints
+- Input validation enforced on all API endpoints
 
-## Security Enhancements Needed if Used in Production
-- Protection against common web vulnerabilities (XSS, CSRF, SQL injection, etc.)
-- Implement distributed rate limiting (redis/database-backend)
-- Add browser fingerprinting for more sophisticated attack prevention
-- Add two-factor authentication option
-- Regular security audits and penetration testing
-- Implement HTTPS with proper certificate management
-- Session timeout and forced re-authentication for sensitive operations
+- Rate limiting to prevent abuse and brute-force attacks
+
+- Authentication required for all protected endpoints
+
+- Use of HTTP-only cookies for storing sensitive tokens (e.g., email verification), reducing risk of token theft via XSS
+
+## Security Enhancements Needed for Production
+- Harden protection against common web vulnerabilities (XSS, CSRF, SQL injection, etc.)
+
+- Implement distributed rate limiting using Redis or another backend
+
+- Add browser fingerprinting or device profiling for advanced threat mitigation
+
+- Implement optional two-factor authentication (2FA)
+
+- Conduct regular security audits and penetration testing
+
+- Enforce HTTPS with proper TLS certificate management
 
 ### Dependency Management
-- Regular updates of all dependencies to address security vulnerabilities
-- Automated dependency scanning
+- Keep all dependencies up to date to patch known vulnerabilities
+
+- Use automated dependency scanning tools
 
 ### Compliance
-- Work toward compliance with industry security standards
-- Commitment to user data privacy and protection
+- Work toward alignment with security best practices and industry standards
+
+- Commit to responsible handling of user data and privacy

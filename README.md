@@ -482,8 +482,9 @@ Example Response:
 ```
 
 ## Future Considerations
-- Enhanced keyboard accessibility (ex: escape to close modals, etc.)
-- The following features are partially implemented and will have their user interface access temporarily disabled:
+Enhanced keyboard accessibility (ex: escape to close modals, etc.)
+
+The following features are partially implemented and will have their user interface access temporarily disabled:
 
 Apply Log Transform, Drop Rows With Missing, Fill Missing With, Filter/Sort, Group Dataset By, Normalize Column, and Standardize Column.
 
@@ -491,7 +492,6 @@ Note: Although "Group Dataset By" is not fully exposed in the UI, functionality 
 
 For other security related updates intended for if this were to ever be launched for production see SECURITY.md.
 
-## License
 ## License
 
 This project is licensed under a **custom restrictive license**.

@@ -236,7 +236,6 @@ func (s *DatasetService) UploadDataset(
 	}
 	peeked := string(peekBuf[:n])
 	delimiter := detectDelimiter(peeked)
-	log.Printf("Detected delimiter: %q", delimiter)
 
 	// Reset the reader
 	fullReader := io.MultiReader(strings.NewReader(peeked), file)

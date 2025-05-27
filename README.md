@@ -3,6 +3,9 @@
 ## Project Overview
 A single page web application that allows users to upload datasets and explore them through visualizations and analysis tools.
 
+## Motivation
+InsightForge was born out of a desire to simplify exploratory data analysis for users who work with raw CSV files but lack access to or expertise in traditional data tools like Jupyter notebooks for Python or the R programming language. By combining a performant Go backend with a React frontend and visualization libraries like Chart.js, InsightForge makes it easy to analyze, transform, and visualize datasets entirely in the browser. This project brings together best practices in API design, database modeling, secure authentication, and frontend integration.
+
 ## Screenshots
   ![Bar Charts](./frontend/public/assets/analytics-preview.png)
   ![Line Charts](./frontend/public/assets/analytics-preview2.png)
@@ -258,7 +261,7 @@ When a CSV is uploaded, InsightForge parses and stores its contents. You then re
 
 Example dataset upload returns:
 
-```http
+```json
 {
   "id": "uuid-of-dataset",
   "name": "uploaded_file.csv",
@@ -270,7 +273,7 @@ Performs operations grouped by a column (e.g., sum of sales by category).
 
 Example Request:
 
-```http
+```json
 GET /analytics/aggregation/grouped-sum?dataset_id=your_uuid&group_by=Gender&column=SpendingScore
 ```
 
@@ -299,7 +302,7 @@ Performs pivot-style aggregations across two categorical axes.
 
 Example Request:
 
-```http
+```json
 GET /analytics/aggregation/pivot-sum?dataset_id=your_uuid&row_field=Age&column=SpendingScore&value_field=Income
 ```
 
@@ -327,7 +330,7 @@ Descriptive stats for a numeric column.
 
 Example Request:
 
-```http
+```json
 GET /analytics/descriptives/mean?dataset_id=your_uuid&column=SpendingScore
 ```
 
@@ -374,7 +377,7 @@ Frequency distributions and kernel density estimates.
 
 Histogram Example:
 
-```http
+```json
 GET /analytics/distribution/histogram?dataset_id=your_uuid&column=SpendingScore
 ```
 
@@ -385,7 +388,7 @@ Example Response:
 ```
 
 KDE Example:
-```http
+```json
 GET /analytics/distribution/kde?dataset_id=your_uuid&column=SpendingScore
 ```
 
@@ -400,7 +403,7 @@ Analyzes relationships between numeric columns.
 
 Example Request:
 
-```http
+```json
 GET /analytics/correlation/pearson-correlation?dataset_id=your_uuid&row_field=Age&column=SpendingScore
 ```
 
@@ -421,7 +424,7 @@ Find correlation across all numeric columns.
 
 Example Request:
 
-```http
+```json
 GET /analytics/correlation/correlation-matrix?dataset_id=your_uuid&method=pearson&column=SpendingScore&column=Income
 ```
 
@@ -440,11 +443,11 @@ Computes IQR and box plot summary for a column.
 
 Example Request:
 
-```http
+```json
 GET /analytics/outliers/iqr-outliers?dataset_id=your_uuid&column=SpendingScore
 ```
 
-```http
+```json
 GET /analytics/outliers/boxplot?dataset_id=your_uuid&column=SpendingScore
 ```
 
@@ -471,7 +474,7 @@ Finds outliers in a column based on z-score threshold.
 
 Example Request:
 
-```http
+```json
 GET //analytics/outliers/zscore-outliers?dataset_id=your_uuid&column=SpendingScore
 ```
 
@@ -503,6 +506,9 @@ The software and associated documentation files (the "Software") are provided so
 You may **NOT** copy, modify, distribute, sublicense, sell, or otherwise exploit the Software in any way without explicit prior written permission from the copyright holder.
 
 For full license details, see the [LICENSE](LICENSE) file.
+
+## Contributing
+I would love your help! If you have any ideas or improvements, contribute by forking the repo and opening a pull request to the `main` branch. **Please be sure to write tests for any changes if applicable.
 
 ## Author
 Bgoodwin24

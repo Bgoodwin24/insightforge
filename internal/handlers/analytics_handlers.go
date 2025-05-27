@@ -113,7 +113,6 @@ func (h *AnalyticsHandler) GroupedSumHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	log.Printf("Group by: %s | Column: %s", groupBy, column)
 
 	c.JSON(http.StatusOK, gin.H{"results": aggregation.GroupedSum(grouped)})
 }
@@ -1545,9 +1544,6 @@ func (h *DatasetHandler) FilterSortHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	log.Printf("Direct call headers: %v", headers)
-	log.Printf("Direct call rows count: %d", len(rows))
-	log.Printf("Headers: %v, rows count: %d\n", headers, len(rows))
 
 	filterColumn := c.DefaultQuery("filter_col", "")
 	filterOp := c.DefaultQuery("filter_op", "")
@@ -1663,8 +1659,6 @@ func (h *AnalyticsHandler) ZScoreOutliersHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	fmt.Println("Zscore Parsed column values:", data)
-	fmt.Println("Zscore Outlier indices:", indices)
 
 	if indices == nil {
 		indices = []int{}
@@ -1709,9 +1703,6 @@ func (h *AnalyticsHandler) IQROutliersHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	fmt.Println("IQR Parsed column values:", data)
-	fmt.Println("IQR Outlier indices:", indices)
 
 	if indices == nil {
 		indices = []int{}

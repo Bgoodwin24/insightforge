@@ -271,88 +271,31 @@ Example dataset upload returns:
 ### Grouped Analytics
 Performs operations grouped by a column (e.g., sum of sales by category).
 
-Example Request:
-
-```json
-GET /analytics/aggregation/grouped-sum?dataset_id=your_uuid&group_by=Gender&column=SpendingScore
-```
-
-Supported endpoints (replace grouped-sum):
-
-grouped-mean
-
-grouped-count
-
-grouped-min
-
-grouped-max
-
-grouped-median
-
-grouped-stddev
-
 Example Response:
 
 ```json
-{"results":{"A":25,"B":5}}
+{
+  "results":{"A":25,"B":5}
+}
 ```
 
 ### Pivot Table Operations
 Performs pivot-style aggregations across two categorical axes.
 
-Example Request:
-
-```json
-GET /analytics/aggregation/pivot-sum?dataset_id=your_uuid&row_field=Age&column=SpendingScore&value_field=Income
-```
-
-Other pivot endpoints:
-
-pivot-mean
-
-pivot-min
-
-pivot-max
-
-pivot-count
-
-pivot-median
-
-pivot-stddev
 Example Response:
 
 ```json
-{"agg_func":"sum","column":"product","results":{"North":{"A":100,"B":200},"South":{"A":300}},"row_field":"region","value_field":"sales"}
+{
+  "agg_func":"sum","column":"product",
+  "results":{"North":{"A":100,"B":200},
+  "South":{"A":300}},
+  "row_field":"region",
+  "value_field":"sales"
+}
 ```
 
 # Summary Statistics
 Descriptive stats for a numeric column.
-
-Example Request:
-
-```json
-GET /analytics/descriptives/mean?dataset_id=your_uuid&column=SpendingScore
-```
-
-Replace `mean` with any of the following to access other statistic endpoints:
-
-median
-
-mode
-
-standard deviation
-
-variance
-
-min
-
-max
-
-sum
-
-range
-
-count
 
 Example Response:
 
@@ -366,6 +309,7 @@ Example Response:
   ]
 }
 ```
+
 Each response includes a `results` array with a single object containing:
 
 - `label`: the type of statistic returned
@@ -375,85 +319,64 @@ Each response includes a `results` array with a single object containing:
 ### Histogram and KDE
 Frequency distributions and kernel density estimates.
 
-Histogram Example:
-
-```json
-GET /analytics/distribution/histogram?dataset_id=your_uuid&column=SpendingScore
-```
+Histogram:
 
 Example Response:
 
 ```json
-{"counts":[2,2,2],"labels":["[1.00, 2.67]","[2.67, 4.33]","[4.33, 6.00]"]}
+{
+  "counts":[2,2,2],
+  "labels":["[1.00, 2.67]","[2.67, 4.33]","[4.33, 6.00]"]
+}
 ```
 
-KDE Example:
-```json
-GET /analytics/distribution/kde?dataset_id=your_uuid&column=SpendingScore
-```
+KDE:
 
 Example Response:
 
 ```json
-{"densities":[0.1398939300142934,0.16764869370173405,0.18530902761596366,0.19434288654157703,0.19779647926952248,0.19779647926952248,0.19434288654157708,0.18530902761596366,0.16764869370173408,0.13989393001429343],"labels":["1.00","1.44","1.89","2.33","2.78","3.22","3.67","4.11","4.56","5.00"]}
+{
+  "densities":[0.1398939300142934,0.16764869370173405,0.18530902761596366,0.19434288654157703,0.19779647926952248,0.19779647926952248,0.19434288654157708,0.18530902761596366,0.16764869370173408,0.13989393001429343],
+  "labels":["1.00","1.44","1.89","2.33","2.78","3.22","3.67","4.11","4.56","5.00"]
+}
 ```
 
 ### Correlation (Pearson, Spearman)
 Analyzes relationships between numeric columns.
 
-Example Request:
-
-```json
-GET /analytics/correlation/pearson-correlation?dataset_id=your_uuid&row_field=Age&column=SpendingScore
-```
-
 Example Response:
 
 Spearman
 ```json
-{"results":{"spearman":-1}}
+{
+  "results":{"spearman":-1}
+}
 ```
 
 Pearson
 ```json
-{"results":{"pearson":1}}
+{
+  "results":{"pearson":1}
+}
 ```
 
 ### Correlation Matrix
 Find correlation across all numeric columns.
 
-Example Request:
-
-```json
-GET /analytics/correlation/correlation-matrix?dataset_id=your_uuid&method=pearson&column=SpendingScore&column=Income
-```
-
-Other matrix endpoint
-
-spearman
-
 Example Response:
 
 ```json
-{"results":{"a":{"a":1,"b":1},"b":{"a":1,"b":1}}}
+{
+  "results":{"a":{"a":1,"b":1},"b":{"a":1,"b":1}}
+}
 ```
 
 ### IQR / Box Plot Data
 Computes IQR and box plot summary for a column.
 
-Example Request:
-
-```json
-GET /analytics/outliers/iqr-outliers?dataset_id=your_uuid&column=SpendingScore
-```
-
-```json
-GET /analytics/outliers/boxplot?dataset_id=your_uuid&column=SpendingScore
-```
-
 Example Response:
 
-IQR
+IQR:
 ```json
 {
   "column": "value",
@@ -463,25 +386,26 @@ IQR
 }
 ```
 
-BoxPlot
+BoxPlot:
 ```json
-{"labels":["Q1","Q3","Lower Outlier","Upper Outlier"],"stats":{"IQR":52.5,"Q1":12.5,"Q3":65,"lower_outlier":-66.25,"upper_outlier":143.75},"values":[12.5,65,-66.25,143.75]}
+{
+  "labels":["Q1","Q3","Lower Outlier","Upper Outlier"],
+  "stats":{"IQR":52.5,"Q1":12.5,"Q3":65,
+  "lower_outlier":-66.25,"upper_outlier":143.75},
+  "values":[12.5,65,-66.25,143.75]
+}
 ```
 
 
 ### Z-Score Outlier Detection
 Finds outliers in a column based on z-score threshold.
 
-Example Request:
-
-```json
-GET //analytics/outliers/zscore-outliers?dataset_id=your_uuid&column=SpendingScore
-```
-
 Example Response:
 
 ```json
-{"indices":[2]}
+{
+  "indices":[2]
+}
 ```
 
 ## Future Considerations
@@ -497,18 +421,24 @@ For other security related updates intended for if this were to ever be launched
 
 ## License
 
-This project is licensed under a **custom restrictive license**.
+This project is licensed under the [Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/).
 
-© 2025 Bgoodwin24. All rights reserved.
+You are free to:
 
-The software and associated documentation files (the "Software") are provided solely for your personal, non-commercial use.
+- **Share** — copy and redistribute the material in any medium or format.
+- **Adapt** — remix, transform, and build upon the material.
 
-You may **NOT** copy, modify, distribute, sublicense, sell, or otherwise exploit the Software in any way without explicit prior written permission from the copyright holder.
+Under the following terms:
 
-For full license details, see the [LICENSE](LICENSE) file.
+- **Attribution** — You must give appropriate credit, provide a link to the license, and indicate if changes were made.
+- **NonCommercial** — You may not use the material for commercial purposes.
+
+No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
+
+See the full license in the [LICENSE](LICENSE) file.
 
 ## Contributing
-I would love your help! If you have any ideas or improvements, contribute by forking the repo and opening a pull request to the `main` branch. **Please be sure to write tests for any changes if applicable.
+I would love your help! If you have any ideas or improvements, contribute by forking the repo and opening a pull request to the `main` branch. **Please be sure to write tests for any changes if applicable.**
 
 ## Author
 Bgoodwin24

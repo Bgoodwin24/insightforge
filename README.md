@@ -4,7 +4,7 @@
 A single page web application that allows users to upload datasets and explore them through visualizations and analysis tools.
 
 ## Motivation
-InsightForge was born out of a desire to simplify exploratory data analysis for users who work with raw CSV files but lack access to or expertise in traditional data tools like Jupyter notebooks for Python or the R programming language. By combining a performant Go backend with a React frontend and visualization libraries like Chart.js, InsightForge makes it easy to analyze, transform, and visualize datasets entirely in the browser. This project brings together best practices in API design, database modeling, secure authentication, and frontend integration.
+InsightForge was born out of a desire to simplify exploratory data analysis for users who work with raw CSV/TSV files but lack access to or expertise in traditional data tools like Jupyter notebooks for Python or the R programming language. By combining a performant Go backend with a React frontend and visualization libraries like Chart.js, InsightForge makes it easy to analyze, transform, and visualize datasets entirely in the browser. This project brings together best practices in API design, database modeling, secure authentication, and frontend integration.
 
 ## Screenshots
   ![Bar Charts](./frontend/public/assets/analytics-preview.png)
